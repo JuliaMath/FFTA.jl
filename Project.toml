@@ -16,7 +16,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 [compat]
 AbstractFFTs = "1"
 DocStringExtensions = "0.9"
-Documenter = "0.27"
+Documenter = "0.27, 1"
 MuladdMacro = "0.2"
 Primes = "0.5"
 Reexport = "1"
