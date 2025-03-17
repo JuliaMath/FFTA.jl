@@ -73,7 +73,7 @@ function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_o
         tmp += in[start_in + j*stride_in]
     end
     out[start_out] = tmp
-    
+
     wk = wkn = w = convert(T, cispi(direction_sign(d)*2/N))
     @inbounds for d in 1:N-1
         tmp = in[start_in]
@@ -98,7 +98,7 @@ function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int
     end
     out[start_out] = convert(Complex{T}, tmpBegin)
     iseven(N) && (out[start_out + stride_out*halfN] = convert(Complex{T}, tmpHalf))
-    
+
     @inbounds for d in 1:halfN
         tmp = in[start_in]
         @inbounds for k in 1:N-1
@@ -200,7 +200,7 @@ function fft_pow4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
 
     w1 = convert(T, cispi(direction_sign(d)*2/N))
     wj = one(T)
-    
+
     w1 = convert(T, cispi(ds*2/N))
     w2 = convert(T, cispi(ds*4/N))
     w3 = convert(T, cispi(ds*6/N))
@@ -212,7 +212,7 @@ function fft_pow4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
         @muladd k2 = start_out + (k+2*m)*stride_out
         @muladd k3 = start_out + (k+3*m)*stride_out
         y_k0, y_k1, y_k2, y_k3 = out[k0], out[k1], out[k2], out[k3]
-        @muladd out[k0] = (y_k0 + y_k2*wk2) + (y_k1*wk1 + y_k3*wk2)
+        @muladd out[k0] = (y_k0 + y_k2*wk2) + (y_k1*wk1 + y_k3*wk3)
         @muladd out[k1] = (y_k0 - y_k2*wk2) + (y_k1*wk1 - y_k3*wk3) * plusi
         @muladd out[k2] = (y_k0 + y_k2*wk2) - (y_k1*wk1 + y_k3*wk3)
         @muladd out[k3] = (y_k0 - y_k2*wk2) + (y_k1*wk1 - y_k3*wk3) * minusi

@@ -1,4 +1,4 @@
-using Test, Random
+using Test, Random, FFTA
 
 function padnum(m,x)
     digs = floor(Int, log10(m))
@@ -6,6 +6,42 @@ function padnum(m,x)
     v = fill(' ', digs-digs_x)
     for d in digits(x)[end:-1:1] push!(v, '0' + d) end
     String(v)
+end
+
+function naive_1d_fourier_transform(x::Vector, d::FFTA.Direction)
+    n = length(x)
+    y = zeros(Complex{Float64}, n)
+
+    for u in 0:(n - 1)
+        s = 0.0 + 0.0im
+        for v in 0:(n - 1)
+            a = FFTA.direction_sign(d) * 2π * u * v / n
+            s += x[v + 1] * exp(im * a)
+        end
+        y[u + 1] = s
+    end
+
+    return y
+end
+
+function naive_2d_fourier_transform(X::Matrix, d::FFTA.Direction)
+    rows, cols = size(X)
+    Y = zeros(Complex{Float64}, rows, cols)
+
+    for u in 0:(rows - 1)
+        for v in 0:(cols - 1)
+            s = 0.0 + 0.0im
+            for x in 0:(rows - 1)
+                for y in 0:(cols - 1)
+                    a = FFTA.direction_sign(d) * 2π * (u * x / rows + v * y / cols)
+                    s += X[x + 1, y + 1] * exp(im * a)
+                end
+            end
+            Y[u + 1, v + 1] = s
+        end
+    end
+
+    return Y
 end
 
 Random.seed!(1)
