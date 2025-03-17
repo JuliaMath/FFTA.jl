@@ -57,18 +57,6 @@ Base.getindex(g::CallGraph{T}, i::Int) where {T} = g.nodes[i]
 
 """
 $(TYPEDSIGNATURES)
-Check if `N` is a power of `base`
-
-"""
-function _ispow(N, base)
-    while N % base == 0
-        N = N/base
-    end
-    return N == 1
-end
-
-"""
-$(TYPEDSIGNATURES)
 Check if `N` is a power of 2 or 4
 
 """
@@ -93,6 +81,9 @@ Recursively instantiate a set of `CallGraphNode`s
 
 """
 function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{Vector{T}}, s_in::Int, s_out::Int)::Int where {T}
+    if N == 0
+        throw(DimensionMismatch("array has to be non-empty"))
+    end
     if iseven(N)
         pow = _ispow24(N)
         if !isnothing(pow)
@@ -102,15 +93,15 @@ function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{
         end
     end
     if N % 3 == 0
-        if _ispow(N, 3)
+        if nextpow(3, N) == N
             push!(workspace, T[])
             push!(nodes, CallGraphNode(0, 0, Pow3FFT(), N, s_in, s_out))
             return 1
         end
     end
-    if isprime(N)
+    if N == 1 || isprime(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0,0, DFT(),N, s_in, s_out))
+        push!(nodes, CallGraphNode(0, 0, DFT(), N, s_in, s_out))
         return 1
     end
     Ns = [first(x) for x in collect(factor(N)) for _ in 1:last(x)]
