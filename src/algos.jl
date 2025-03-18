@@ -89,18 +89,16 @@ end
 
 function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, d::Direction) where {T<:Real}
     halfN = N÷2
-    wk = wkn = w = convert(Complex{T}, cispi(direction_sign(d)*2/N))
 
-    tmpBegin = tmpHalf = in[start_in]
+    tmp = Complex{T}(in[start_in])
     @inbounds for j in 1:N-1
-        tmpBegin += in[start_in + stride_in*j]
-        iseven(j) ? tmpHalf += in[start_in + stride_in*j] : tmpHalf -= in[start_in + stride_in*j]
+        tmp += in[start_in + j*stride_in]
     end
-    out[start_out] = convert(Complex{T}, tmpBegin)
-    iseven(N) && (out[start_out + stride_out*halfN] = convert(Complex{T}, tmpHalf))
+    out[start_out] = tmp
 
+    wk = wkn = w = convert(Complex{T}, cispi(direction_sign(d)*2/N))
     @inbounds for d in 1:halfN
-        tmp = in[start_in]
+        tmp = Complex{T}(in[start_in])
         @inbounds for k in 1:N-1
             tmp += wkn*in[start_in + k*stride_in]
             wkn *= wk
@@ -108,9 +106,6 @@ function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int
         out[start_out + d*stride_out] = tmp
         wk *= w
         wkn = wk
-    end
-    @inbounds for k in halfN+1:N-1
-        out[start_out + stride_out*k] = conj(out[start_out + stride_out*(N-k)])
     end
 end
 
