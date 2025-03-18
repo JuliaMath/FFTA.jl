@@ -12,7 +12,14 @@ end
 
 @testset verbose = true "against naive implementation. Size: $n" for n in 1:64
     x = randn(n)
-    @test naive_1d_fourier_transform(x, FFTA.FFT_FORWARD)[1:(n ÷ 2 + 1)] ≈ rfft(x)
+    y = rfft(x)
+    @test naive_1d_fourier_transform(x, FFTA.FFT_FORWARD)[1:(n ÷ 2 + 1)] ≈ y
+
+    @testset "temporarily test real dft separately until used by rfft" begin
+        y_dft = similar(y)
+        FFTA.fft_dft!(y_dft, x, n, 1, 1, 1, 1, FFTA.FFT_FORWARD)
+        @test y ≈ y_dft
+    end
 end
 
 @testset "error messages" begin
