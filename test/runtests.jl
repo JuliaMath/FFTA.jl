@@ -1,13 +1,5 @@
 using Test, Random, FFTA
 
-function padnum(m,x)
-    digs = floor(Int, log10(m))
-    digs_x = floor(Int, log10(x))
-    v = fill(' ', digs-digs_x)
-    for d in digits(x)[end:-1:1] push!(v, '0' + d) end
-    String(v)
-end
-
 function naive_1d_fourier_transform(x::Vector, d::FFTA.Direction)
     n = length(x)
     y = zeros(Complex{Float64}, n)
