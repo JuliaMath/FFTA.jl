@@ -33,24 +33,55 @@ function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, sta
     N2 = right.sz
     s_in = root.s_in
     s_out = root.s_out
+    tmp = g.workspace[idx]
 
+    _CompositeFFT_right_loop(tmp, in, N1, N2, start_in, s_in, d, g, right.type, right_idx)
+    _CompositeFFT_left_loop(out, tmp, N2, start_out, s_out, d, g, left.type, left_idx)
+end
+
+function _CompositeFFT_right_loop(
+    tmp::AbstractVector{T},
+    in::AbstractVector{T},
+    N1::Int,
+    N2::Int,
+    start_in::Int,
+    s_in::Int,
+    d::Direction,
+    g::CallGraph,
+    type::AbstractFFTType,
+    idx::Int
+) where T
+
+    N = N1 * N2
     w1 = convert(T, cispi(direction_sign(d)*2/N))
     wj1 = one(T)
-    tmp = g.workspace[idx]
     @inbounds for j1 in 0:N1-1
         wk2 = wj1
-        g(tmp, in, N2*j1+1, start_in + j1*s_in, d, right.type, right_idx)
+        g(tmp, in, N2*j1+1, start_in + j1*s_in, d, type, idx)
         j1 > 0 && @inbounds for k2 in 1:N2-1
             tmp[N2*j1 + k2 + 1] *= wk2
             wk2 *= wj1
         end
         wj1 *= w1
     end
+end
 
-    @inbounds for k2 in 0:N2-1
-        g(out, tmp, start_out + k2*s_out, k2+1, d, left.type, left_idx)
+function _CompositeFFT_left_loop(
+    out::AbstractVector{T},
+    tmp::AbstractVector{T},
+    N::Int,
+    start_out::Int,
+    s_out::Int,
+    d::Direction,
+    g::CallGraph,
+    type::AbstractFFTType,
+    idx::Int
+) where T
+    @inbounds for k in 0:N-1
+        g(out, tmp, start_out + k*s_out, k+1, d, type, idx)
     end
 end
+
 
 """
 $(TYPEDSIGNATURES)
