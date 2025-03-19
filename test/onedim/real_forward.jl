@@ -17,7 +17,7 @@ end
 
     @testset "temporarily test real dft separately until used by rfft" begin
         y_dft = similar(y)
-        FFTA.fft_dft!(y_dft, x, n, 1, 1, 1, 1, FFTA.FFT_FORWARD)
+        FFTA.fft_dft!(y_dft, x, n, 1, 1, 1, 1, cispi(-2/n))
         @test y ≈ y_dft
     end
 end

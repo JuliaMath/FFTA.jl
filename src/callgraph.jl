@@ -32,13 +32,14 @@ Node of a call graph
 `sz`: Size of this FFT
 
 """
-struct CallGraphNode
+struct CallGraphNode{T}
     left::Int
     right::Int
     type::FFTEnum
     sz::Int
     s_in::Int
     s_out::Int
+    w::T
 end
 
 """
@@ -51,7 +52,7 @@ Object representing a graph of FFT Calls
 
 """
 struct CallGraph{T<:Complex}
-    nodes::Vector{CallGraphNode}
+    nodes::Vector{CallGraphNode{T}}
     workspace::Vector{Vector{T}}
 end
 
@@ -83,28 +84,29 @@ Recursively instantiate a set of `CallGraphNode`s
 `s_out`: The stride of the output
 
 """
-function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{Vector{T}}, s_in::Int, s_out::Int)::Int where {T}
+function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vector{Vector{T}}, s_in::Int, s_out::Int)::Int where {T}
     if N == 0
         throw(DimensionMismatch("array has to be non-empty"))
     end
+    w = convert(T, cispi(2/N))
     if iseven(N)
         pow = _ispow24(N)
         if !isnothing(pow)
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, pow == POW2 ? pow2FFT : pow4FFT, N, s_in, s_out))
+            push!(nodes, CallGraphNode(0, 0, pow == POW2 ? pow2FFT : pow4FFT, N, s_in, s_out, w))
             return 1
         end
     end
     if N % 3 == 0
         if nextpow(3, N) == N
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, pow3FFT, N, s_in, s_out))
+            push!(nodes, CallGraphNode(0, 0, pow3FFT, N, s_in, s_out, w))
             return 1
         end
     end
     if N == 1 || isprime(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out))
+        push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out, w))
         return 1
     end
     Ns = [first(x) for x in collect(factor(N)) for _ in 1:last(x)]
@@ -121,12 +123,12 @@ function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{
         N1 = N_cp[N1_idx]
     end
     N2 = N ÷ N1
-    push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out))
+    push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out, w))
     sz = length(nodes)
     push!(workspace, Vector{T}(undef, N))
     left_len = CallGraphNode!(nodes, N1, workspace, N2, N2*s_out)
     right_len = CallGraphNode!(nodes, N2, workspace, N1*s_in, 1)
-    nodes[sz] = CallGraphNode(1, 1 + left_len, compositeFFT, N, s_in, s_out)
+    nodes[sz] = CallGraphNode(1, 1 + left_len, compositeFFT, N, s_in, s_out, w)
     return 1 + left_len + right_len
 end
 
@@ -136,7 +138,7 @@ Instantiate a CallGraph from a number `N`
 
 """
 function CallGraph{T}(N::Int) where {T}
-    nodes = CallGraphNode[]
+    nodes = CallGraphNode{T}[]
     workspace = Vector{Vector{T}}()
     CallGraphNode!(nodes, N, workspace, 1, 1)
     CallGraph(nodes, workspace)
