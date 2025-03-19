@@ -18,6 +18,9 @@ struct Pow4FFT <: AbstractFFTType end
 # Represents an O(N²) DFT
 struct DFT <: AbstractFFTType end
 
+
+@enum FFTEnum compositeFFT dft pow2FFT pow3FFT pow4FFT
+
 """
 $(TYPEDSIGNATURES)
 Node of a call graph
@@ -32,7 +35,7 @@ Node of a call graph
 struct CallGraphNode
     left::Int
     right::Int
-    type::AbstractFFTType
+    type::FFTEnum
     sz::Int
     s_in::Int
     s_out::Int
@@ -88,20 +91,20 @@ function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{
         pow = _ispow24(N)
         if !isnothing(pow)
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, pow == POW2 ? Pow2FFT() : Pow4FFT(), N, s_in, s_out))
+            push!(nodes, CallGraphNode(0, 0, pow == POW2 ? pow2FFT : pow4FFT, N, s_in, s_out))
             return 1
         end
     end
     if N % 3 == 0
         if nextpow(3, N) == N
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, Pow3FFT(), N, s_in, s_out))
+            push!(nodes, CallGraphNode(0, 0, pow3FFT, N, s_in, s_out))
             return 1
         end
     end
     if N == 1 || isprime(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, DFT(), N, s_in, s_out))
+        push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out))
         return 1
     end
     Ns = [first(x) for x in collect(factor(N)) for _ in 1:last(x)]
@@ -118,12 +121,12 @@ function CallGraphNode!(nodes::Vector{CallGraphNode}, N::Int, workspace::Vector{
         N1 = N_cp[N1_idx]
     end
     N2 = N ÷ N1
-    push!(nodes, CallGraphNode(0,0,DFT(),N,s_in,s_out))
+    push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out))
     sz = length(nodes)
     push!(workspace, Vector{T}(undef, N))
     left_len = CallGraphNode!(nodes, N1, workspace, N2, N2*s_out)
     right_len = CallGraphNode!(nodes, N2, workspace, N1*s_in, 1)
-    nodes[sz] = CallGraphNode(1, 1 + left_len, CompositeFFT(), N, s_in, s_out)
+    nodes[sz] = CallGraphNode(1, 1 + left_len, compositeFFT, N, s_in, s_out)
     return 1 + left_len + right_len
 end
 

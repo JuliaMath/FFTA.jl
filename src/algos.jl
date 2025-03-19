@@ -4,9 +4,27 @@ fft!(::AbstractVector{T}, ::AbstractVector{T}, ::Int, ::Int, ::Direction, ::Abst
     Int(d)
 end
 
-function (g::CallGraph{T})(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, v::Direction, t::AbstractFFTType, idx::Int) where {T,U}
+function (g::CallGraph{T})(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, v::Direction, t::FFTEnum, idx::Int) where {T,U}
     fft!(out, in, start_out, start_in, v, t, g, idx)
 end
+
+
+function fft!(out::AbstractVector, in::AbstractVector, start_out::Int, start_in::Int, d::Direction, e::FFTEnum, g::CallGraph, idx::Int)
+    if e === compositeFFT
+        fft!(out, in, start_out, start_in, d, CompositeFFT(), g, idx)
+    elseif e == dft
+        fft!(out, in, start_out, start_in, d, DFT(), g, idx)
+    elseif e === pow2FFT
+        fft!(out, in, start_out, start_in, d, Pow2FFT(), g, idx)
+    elseif e === pow3FFT
+        fft!(out, in, start_out, start_in, d, Pow3FFT(), g, idx)
+    elseif e === pow4FFT
+        fft!(out, in, start_out, start_in, d, Pow4FFT(), g, idx)
+    else
+        throw(ArgumentError("kernel not implemented"))
+    end
+end
+
 
 """
 $(TYPEDSIGNATURES)
