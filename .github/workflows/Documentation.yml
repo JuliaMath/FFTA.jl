@@ -3,7 +3,7 @@ name: Documentation
 on:
   push:
     branches:
-      - dannys4/logistical_changes
+      - main
     tags: '*'
   pull_request:
 
