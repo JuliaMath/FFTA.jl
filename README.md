@@ -1,5 +1,4 @@
 # FFTA: Fastest Fourier Transform in my Apartment
-## A library by Danny Sharp
 
 [![CI](https://github.com/JuliaMath/FFTA.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/JuliaMath/FFTA.jl/actions/workflows/ci.yml)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliamath.github.io/FFTA.jl/stable/)
@@ -20,8 +19,6 @@ Interface:
 - `fft(x::AbstractMatrix})`-- Forward FFT
 - `bfft(x::AbstractVector})`-- Backward FFT (unscaled inverse FFT)
 - `bfft(x::AbstractMatrix})`-- Backward FFT (unscaled inverse FFT)
-
-NOTE: Currently, my C++ code is actually faster than this, so "Fastest Fourier Transform in my Apartment" is a bit of a misnomer.
 
 
 ## Why use this?
