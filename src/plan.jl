@@ -112,6 +112,23 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan{T,2}, x::Abstract
     R3 = CartesianIndices(size(x)[p.region[2]+1:end])
     y_tmp = similar(y, axes(y)[p.region])
     rows,cols = size(x)[p.region]
+    # Introduce function barrier here since the variables used in the loop ranges aren't inferred. This
+    # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
+    # it might be a bit tricky to construct the Rxs in an inferred way.
+    _mul_loop(y_tmp, y, x, p, R1, R2, R3, rows, cols)
+end
+
+function _mul_loop(
+    y_tmp::AbstractArray,
+    y::AbstractArray,
+    x::AbstractArray,
+    p::FFTAPlan,
+    R1::CartesianIndices,
+    R2::CartesianIndices,
+    R3::CartesianIndices,
+    rows::Int,
+    cols::Int
+)
     for I1 in R1
         for I2 in R2
             for I3 in R3
