@@ -22,8 +22,8 @@ end
         end
     end
 
-    @testset "allocation" begin
-        @test (@allocations rfft(x)) <= 48
+    @testset "allocation regression" begin
+        @test (@test_allocations rfft(x)) <= 48
     end
 end
 

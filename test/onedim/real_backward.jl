@@ -25,8 +25,8 @@ end
         @test naive_1d_fourier_transform(xe, FFTA.FFT_BACKWARD) ≈ brfft(x, n)
     end
 
-    @testset "allocation" begin
-        @test (@allocations brfft(x, n)) <= 50
+    @testset "allocation regression" begin
+        @test (@test_allocations brfft(x, n)) <= 50
     end
 end
 
