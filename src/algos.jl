@@ -1,29 +1,33 @@
-fft!(::AbstractVector{T}, ::AbstractVector{T}, ::Int, ::Int, ::Direction, ::AbstractFFTType, ::CallGraph{T}, ::Int) where {T} = nothing
-
 @inline function direction_sign(d::Direction)
     Int(d)
 end
 
 @inline _conj(w::Complex, d::Direction) = ifelse(direction_sign(d) === 1, w, conj(w))
 
-function (g::CallGraph{T})(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, v::Direction, t::FFTEnum, idx::Int) where {T,U}
-    fft!(out, in, start_out, start_in, v, t, g, idx)
-end
-
-
-function fft!(out::AbstractVector, in::AbstractVector, start_out::Int, start_in::Int, d::Direction, e::FFTEnum, g::CallGraph, idx::Int)
-    if e === compositeFFT
-        fft!(out, in, start_out, start_in, d, CompositeFFT(), g, idx)
-    elseif e == dft
-        fft!(out, in, start_out, start_in, d, DFT(), g, idx)
-    elseif e === pow2FFT
-        fft!(out, in, start_out, start_in, d, Pow2FFT(), g, idx)
-    elseif e === pow3FFT
-        fft!(out, in, start_out, start_in, d, Pow3FFT(), g, idx)
-    elseif e === pow4FFT
-        fft!(out, in, start_out, start_in, d, Pow4FFT(), g, idx)
+function fft!(out::AbstractVector{T}, in::AbstractVector{T}, start_out::Int, start_in::Int, d::Direction, t::FFTEnum, g::CallGraph{T}, idx::Int) where T
+    if t === compositeFFT
+        fft_composite!(out, in, start_out, start_in, d, g, idx)
     else
-        throw(ArgumentError("kernel not implemented"))
+        root = g[idx]
+        if t == dft
+            fft_dft!(out, in, root.sz, start_out, root.s_out, start_in, root.s_in, _conj(root.w, d))
+        else
+            N = root.sz
+            s_in = root.s_in
+            s_out = root.s_out
+            if t === pow2FFT
+                fft_pow2!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d))
+            elseif t === pow3FFT
+                p_120 = convert(T, cispi(2/3))
+                m_120 = convert(T, cispi(4/3))
+                _p_120, _m_120 = d == FFT_FORWARD ? (p_120, m_120) : (m_120, p_120)
+                fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d), _m_120, _p_120)
+            elseif t === pow4FFT
+                fft_pow4!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d))
+            else
+                throw(ArgumentError("kernel not implemented"))
+            end
+        end
     end
 end
 
@@ -42,7 +46,7 @@ Cooley-Tukey composite FFT, with a pre-computed call graph
 `idx`: Index of the current transform in the call graph
 
 """
-function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, ::CompositeFFT, g::CallGraph{T}, idx::Int) where {T,U}
+function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, g::CallGraph{T}, idx::Int) where {T,U}
     root = g[idx]
     left_idx = idx + root.left
     right_idx = idx + root.right
@@ -59,7 +63,7 @@ function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, sta
     tmp = g.workspace[idx]
     @inbounds for j1 in 0:N1-1
         wk2 = wj1
-        g(tmp, in, N2*j1+1, start_in + j1*s_in, d, right.type, right_idx)
+        fft!(tmp, in, N2*j1+1, start_in + j1*s_in, d, right.type, g, right_idx)
         j1 > 0 && @inbounds for k2 in 1:N2-1
             tmp[N2*j1 + k2 + 1] *= wk2
             wk2 *= wj1
@@ -68,7 +72,7 @@ function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, sta
     end
 
     @inbounds for k2 in 0:N2-1
-        g(out, tmp, start_out + k2*s_out, k2+1, d, left.type, left_idx)
+        fft!(out, tmp, start_out + k2*s_out, k2+1, d, left.type, g, left_idx)
     end
 end
 
@@ -129,11 +133,6 @@ function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int
     end
 end
 
-function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, ::DFT, g::CallGraph{T}, idx::Int) where {T,U}
-    root = g[idx]
-    fft_dft!(out, in, root.sz, start_out, root.s_out, start_in, root.s_in, _conj(root.w, d))
-end
-
 """
 $(TYPEDSIGNATURES)
 Power of 2 FFT, in place
@@ -171,13 +170,6 @@ function fft_pow2!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     end
 end
 
-function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, ::Pow2FFT, g::CallGraph{T}, idx::Int) where {T,U}
-    root = g[idx]
-    N = root.sz
-    s_in = root.s_in
-    s_out = root.s_out
-    fft_pow2!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d))
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -248,13 +240,6 @@ function fft_pow4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     end
 end
 
-function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, ::Pow4FFT, g::CallGraph{T}, idx::Int) where {T,U}
-    root = g[idx]
-    N = root.sz
-    s_in = root.s_in
-    s_out = root.s_out
-    fft_pow4!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d))
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -302,19 +287,5 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
         @muladd out[k2] = y_k0 + y_k1*wk1*minus120 + y_k2*wk2*plus120
         wk1 *= w1
         wk2 *= w2
-    end
-end
-
-function fft!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, ::Pow3FFT, g::CallGraph{T}, idx::Int) where {T,U}
-    root = g[idx]
-    N = root.sz
-    s_in = root.s_in
-    s_out = root.s_out
-    p_120 = convert(T, cispi(2/3))
-    m_120 = convert(T, cispi(4/3))
-    if d == FFT_FORWARD
-        fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d), m_120, p_120)
-    else
-        fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d), p_120, m_120)
     end
 end

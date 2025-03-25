@@ -1,24 +1,5 @@
 @enum Direction FFT_FORWARD=-1 FFT_BACKWARD=1
 @enum Pow24 POW2=2 POW4=1
-
-abstract type AbstractFFTType end
-
-# Represents a Composite Cooley-Tukey FFT
-struct CompositeFFT <: AbstractFFTType end
-
-# Represents a Radix-2 Cooley-Tukey FFT
-struct Pow2FFT <: AbstractFFTType end
-
-# Represents a Radix-3 Cooley-Tukey FFT
-struct Pow3FFT <: AbstractFFTType end
-
-# Represents a Radix-4 Cooley-Tukey FFT
-struct Pow4FFT <: AbstractFFTType end
-
-# Represents an O(N²) DFT
-struct DFT <: AbstractFFTType end
-
-
 @enum FFTEnum compositeFFT dft pow2FFT pow3FFT pow4FFT
 
 """
