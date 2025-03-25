@@ -15,8 +15,8 @@ end
         @test naive_1d_fourier_transform(x, FFTA.FFT_FORWARD) ≈ fft(x)
     end
 
-    @testset "allocation" begin
-        @test (@allocations fft(x)) <= 44
+    @testset "allocation regression" begin
+        @test (@test_allocations fft(x)) <= 44
     end
 end
 
