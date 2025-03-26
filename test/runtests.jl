@@ -1,5 +1,13 @@
 using Test, Random, FFTA
 
+macro test_allocations(args)
+    if Base.VERSION >= v"1.9"
+        :(@allocations($(esc(args))))
+    else
+        :(0)
+    end
+end
+
 function naive_1d_fourier_transform(x::Vector, d::FFTA.Direction)
     n = length(x)
     y = zeros(Complex{Float64}, n)
