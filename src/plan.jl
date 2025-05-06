@@ -20,7 +20,7 @@ struct FFTAPlan_re{T,N} <: FFTAPlan{T,N}
     flen::Int
 end
 
-function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+function __FFTA_plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -36,7 +36,11 @@ function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan
     end
 end
 
-function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+    __FFTA_plan_fft(x::AbstractArray, region; kwargs...)
+end
+
+function __FFTA_plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -52,7 +56,11 @@ function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPla
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
+function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+    __FFTA_plan_bfft(x::AbstractArray, region; kwargs...)
+end
+
+function __FFTA_plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -68,7 +76,11 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPla
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
+function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
+    __FFTA_plan_rfft(x::AbstractArray, region; kwargs...)
+end
+
+function __FFTA_plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -82,6 +94,10 @@ function AbstractFFTs.plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::F
         pinv = FFTAInvPlan{T,N}()
         return FFTAPlan_re{T,N}((g1,g2), region, FFT_BACKWARD, pinv, len)
     end
+end
+
+function AbstractFFTs.plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
+    __FFTA_plan_brfft(x::AbstractArray, len, region; kwargs...)
 end
 
 function AbstractFFTs.plan_bfft(p::FFTAPlan_cx{T,N}) where {T,N}
