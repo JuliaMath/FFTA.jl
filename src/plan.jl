@@ -193,7 +193,7 @@ for f in (:fft, :bfft, :rfft, :brfft)
     abstract_pf = Symbol("plan_", f)
     T_super = f == :rfft ? Real : Complex
     @eval begin
-        function AbstractFFTs.$abstract_pf(x::AbstractArray{T}, args...; kws...) where {T<:$T_super}
+        @inline function AbstractFFTs.$abstract_pf(x::AbstractArray{T}, args...; kws...) where {T<:$T_super}
             $pf(x, args...; kws...)
         end
     end
