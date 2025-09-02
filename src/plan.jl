@@ -171,20 +171,6 @@ function *(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real, Comp
     end
 end
 
-function *(p::FFTAPlan_re{T,N}, x::AbstractArray{T,2}) where {T<:Union{Real, Complex}, N}
-    if p.dir == FFT_FORWARD
-        y = similar(x, T <: Real ? Complex{T} : T)
-        LinearAlgebra.mul!(y, p, x)
-        return y[1:end÷2 + 1,:]
-    else
-        x_tmp = similar(x, p.flen, size(x)[2])
-        x_tmp[1:end÷2 + 1,:] .= x
-        x_tmp[end÷2 + 2:end,:] .= iseven(p.flen) ? conj.(x[end-1:-1:2,:]) : conj.(x[end:-1:2,:])
-        y = similar(x_tmp)
-        LinearAlgebra.mul!(y, p, x_tmp)
-        return y
-    end
-end
 
 function *(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
   if p.dir == FFT_FORWARD
