@@ -185,3 +185,19 @@ function *(p::FFTAPlan_re{T,N}, x::AbstractArray{T,2}) where {T<:Union{Real, Com
         return y
     end
 end
+
+function *(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
+  if p.dir == FFT_FORWARD
+    y = similar(x, T <: Real ? Complex{T} : T)
+    LinearAlgebra.mul!(y, p, x)
+    return copy(selectdim(y,p.region[1],1:size(y,p.region[1])÷2+1))
+  else
+    res_size = Base.setindex(size(x), p.flen, p.region[1])
+    x_tmp = similar(x, res_size)
+    selectdim(x_tmp, p.region[1], 1:size(x_tmp,p.region[1])÷2 + 1) .= x
+    selectdim(x_tmp, p.region[1], size(x_tmp,p.region[1])÷2 + 2:size(x_tmp,p.region[1])) .= iseven(p.flen) ? conj.(selectdim(x,p.region[1],size(x,p.region[1])-1:-1:2)) : conj.(selectdim(x,p.region[1],size(x,p.region[1]):-1:2))
+    y = similar(x_tmp)
+    LinearAlgebra.mul!(y, p, x_tmp)
+    return y
+  end
+end
