@@ -85,12 +85,12 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
             return 1
         end
     end
-    if N == 1 || isprime(N)
+    if N == 1 || Primes.isprime(N)
         push!(workspace, T[])
         push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out, w))
         return 1
     end
-    Ns = [first(x) for x in collect(factor(N)) for _ in 1:last(x)]
+    Ns = [first(x) for x in collect(Primes.factor(N)) for _ in 1:last(x)]
     if Ns[1] == 2
         N1 = prod(Ns[Ns .== 2])
     elseif Ns[1] == 3
