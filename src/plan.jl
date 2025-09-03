@@ -1,6 +1,12 @@
 import Base: *
 import LinearAlgebra: mul!
 
+export FFTABackend
+struct FFTABackend <: AbstractFFTBackend end
+backend() = FFTABackend()
+activate!() = AbstractFFTs.set_active_backend!(FFTA)
+
+
 abstract type FFTAPlan{T,N} <: Plan{T} end
 
 struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
@@ -20,7 +26,7 @@ struct FFTAPlan_re{T,N} <: FFTAPlan{T,N}
     flen::Int
 end
 
-function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+function AbstractFFTs.plan_fft(::FFTABackend, x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -36,7 +42,7 @@ function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan
     end
 end
 
-function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
+function AbstractFFTs.plan_bfft(::FFTABackend, x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -52,7 +58,7 @@ function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPla
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
+function AbstractFFTs.plan_rfft(::FFTABackend, x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
@@ -68,7 +74,7 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPla
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
+function AbstractFFTs.plan_brfft(::FFTABackend, x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
     N = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
     if N == 1
