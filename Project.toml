@@ -15,13 +15,15 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 [compat]
 AbstractFFTs = "1"
 DocStringExtensions = "0.9"
+ExplicitImports = "1.12"
 MuladdMacro = "0.2"
 Primes = "0.5"
 Reexport = "1"
 julia = "1.6"
 
 [extras]
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["ExplicitImports", "Test"]

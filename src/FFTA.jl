@@ -1,9 +1,13 @@
 module FFTA
 
-using Primes, DocStringExtensions, Reexport, MuladdMacro, LinearAlgebra
-@reexport using AbstractFFTs
+using AbstractFFTs: AbstractFFTs
+using DocStringExtensions: TYPEDSIGNATURES
+using LinearAlgebra: LinearAlgebra
+using MuladdMacro: @muladd
+using Primes: Primes
+using Reexport: @reexport
 
-import AbstractFFTs: Plan
+@reexport using AbstractFFTs
 
 include("callgraph.jl")
 include("algos.jl")

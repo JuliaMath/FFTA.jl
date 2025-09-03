@@ -1,7 +1,4 @@
-import Base: *
-import LinearAlgebra: mul!
-
-abstract type FFTAPlan{T,N} <: Plan{T} end
+abstract type FFTAPlan{T,N} <: AbstractFFTs.Plan{T} end
 
 struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
 
@@ -144,19 +141,19 @@ function _mul_loop(
     end
 end
 
-function *(p::FFTAPlan{T,1}, x::AbstractVector{T}) where {T<:Union{Real,Complex}}
+function Base.:*(p::FFTAPlan{T,1}, x::AbstractVector{T}) where {T<:Union{Real,Complex}}
     y = similar(x, T <: Real ? Complex{T} : T)
     LinearAlgebra.mul!(y, p, x)
     y
 end
 
-function *(p::FFTAPlan{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
+function Base.:*(p::FFTAPlan{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
     y = similar(x, T <: Real ? Complex{T} : T)
     LinearAlgebra.mul!(y, p, x)
     y
 end
 
-function *(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real, Complex}}
+function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real, Complex}}
     if p.dir == FFT_FORWARD
         y = similar(x, T <: Real ? Complex{T} : T)
         LinearAlgebra.mul!(y, p, x)
@@ -171,7 +168,7 @@ function *(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real, Comp
     end
 end
 
-function *(p::FFTAPlan_re{T,N}, x::AbstractArray{T,2}) where {T<:Union{Real, Complex}, N}
+function Base.:*(p::FFTAPlan_re{T,N}, x::AbstractArray{T,2}) where {T<:Union{Real, Complex}, N}
     if p.dir == FFT_FORWARD
         y = similar(x, T <: Real ? Complex{T} : T)
         LinearAlgebra.mul!(y, p, x)
