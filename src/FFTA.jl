@@ -9,5 +9,8 @@ include("callgraph.jl")
 include("algos.jl")
 include("plan.jl")
 
+function __init__()
+  activate!()
+end
 
 end
