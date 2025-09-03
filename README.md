@@ -3,6 +3,7 @@
 [![CI](https://github.com/JuliaMath/FFTA.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/JuliaMath/FFTA.jl/actions/workflows/ci.yml)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliamath.github.io/FFTA.jl/stable/)
 [![codecov](https://codecov.io/gh/JuliaMath/FFTA.jl/graph/badge.svg?token=LEUDt0h3CG)](https://codecov.io/gh/JuliaMath/FFTA.jl)
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 This is a *pure Julia* implementation of FFTs, with the goal that this could supplant other FFTs for applications that require odd Julia objects. Currently this supports `AbstractArray{T,N}` where `N` in `{1,2}` (i.e. `AbstractVector` and `AbstractMatrix`). If you're looking for more performance, checkout `FFTW.jl`. Regardless of `T`, `one(::Type{T})` must be defined. Additionally, if `T<:Real`, then `convert(::Type{T}, Float64)` has to be defined. Otherwise, `convert(::Type{T},ComplexF64)` must be defined.
 
