@@ -170,16 +170,15 @@ end
 
 
 function Base.:*(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
+  half_1 = 1:(p.flen ÷ 2 + 1)
   if p.dir == FFT_FORWARD
     y = similar(x, T <: Real ? Complex{T} : T)
     LinearAlgebra.mul!(y, p, x)
-    half_1 = Base.OneTo(p.flen ÷ 2 + 1)
     return copy(selectdim(y, p.region[1], half_1))
   else
     res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
     # for the inverse transformation we have to reconstruct the full array
     x_full = similar(x, res_size)
-    half_1 = Base.OneTo(p.flen ÷ 2 + 1)
     half_2 = half_1[end]+1:p.flen
     # use first half as is
     copy!(selectdim(x_full, p.region[1], half_1), x)
