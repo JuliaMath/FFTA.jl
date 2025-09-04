@@ -168,17 +168,26 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real
     end
 end
 
-function Base.:*(p::FFTAPlan_re{T,N}, x::AbstractArray{T,2}) where {T<:Union{Real, Complex}, N}
-    if p.dir == FFT_FORWARD
-        y = similar(x, T <: Real ? Complex{T} : T)
-        LinearAlgebra.mul!(y, p, x)
-        return y[1:end÷2 + 1,:]
-    else
-        x_tmp = similar(x, p.flen, size(x)[2])
-        x_tmp[1:end÷2 + 1,:] .= x
-        x_tmp[end÷2 + 2:end,:] .= iseven(p.flen) ? conj.(x[end-1:-1:2,:]) : conj.(x[end:-1:2,:])
-        y = similar(x_tmp)
-        LinearAlgebra.mul!(y, p, x_tmp)
-        return y
-    end
+
+function Base.:*(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
+  half_1 = 1:(p.flen ÷ 2 + 1)
+  if p.dir == FFT_FORWARD
+    y = similar(x, T <: Real ? Complex{T} : T)
+    LinearAlgebra.mul!(y, p, x)
+    return copy(selectdim(y, p.region[1], half_1))
+  else
+    res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
+    # for the inverse transformation we have to reconstruct the full array
+    x_full = similar(x, res_size)
+    half_2 = half_1[end]+1:p.flen
+    # use first half as is
+    copy!(selectdim(x_full, p.region[1], half_1), x)
+    start_reverse = size(x, p.region[1]) - iseven(p.flen)
+    half_reverse = (start_reverse:-1:2)
+    # the second half is reversed and conjugated
+    map!(conj, selectdim(x_full, p.region[1], half_2), selectdim(x, p.region[1], half_reverse))
+    y = similar(x_full)
+    LinearAlgebra.mul!(y, p, x_full)
+    return y
+  end
 end

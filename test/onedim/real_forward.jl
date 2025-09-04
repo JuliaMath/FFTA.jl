@@ -6,6 +6,8 @@ using FFTA, Test
     y_ref = 0*y
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
+    @test y == rfft(reshape(x,1,1,N),3)[1,1,:]
+    @test y == rfft(reshape(x,N,1),1)[:,1]
 end
 
 @testset "More forward tests. Size: $n" for n in 1:64
