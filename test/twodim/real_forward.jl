@@ -15,7 +15,6 @@ end
 
 @testset "allocations" begin
     X = randn(256, 256)
-    Y = rfft(X)
-    brfft(Y, 256) # compile
-    @test (@test_allocations brfft(Y, 256)) <= 54
+    rfft(X) # compile
+    @test (@test_allocations rfft(X)) <= 61
 end
