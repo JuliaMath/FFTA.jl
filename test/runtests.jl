@@ -46,6 +46,10 @@ end
 
 Random.seed!(1)
 @testset verbose = true "FFTA" begin
+    @testset verbose = true "QA" begin
+        include("qa/aqua.jl")
+        include("qa/explicit_imports.jl")
+    end
     @testset verbose = true "1D" begin
         @testset verbose = false "Complex" begin
             include("onedim/complex_forward.jl")
