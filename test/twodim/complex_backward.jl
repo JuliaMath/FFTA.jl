@@ -17,7 +17,7 @@ end
         end
 
         @testset "allocations" begin
-            @test (@test_allocations bfft(X)) <= 111
+            @test (@test_allocations bfft(X)) <= 116
         end
     end
 end

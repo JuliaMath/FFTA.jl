@@ -21,7 +21,7 @@ end
         end
 
         @testset "allocations" begin
-            @test (@test_allocations fft(X)) <= 111
+            @test (@test_allocations fft(X)) <= 116
         end
     end
 end

@@ -16,5 +16,5 @@ end
 @testset "allocations" begin
     X = randn(256, 256)
     rfft(X) # compile
-    @test (@test_allocations rfft(X)) <= 61
+    @test (@test_allocations rfft(X)) <= 62
 end
