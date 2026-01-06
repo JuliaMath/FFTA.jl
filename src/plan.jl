@@ -141,53 +141,65 @@ function _mul_loop(
     end
 end
 
-function Base.:*(p::FFTAPlan{T,1}, x::AbstractVector{T}) where {T<:Union{Real,Complex}}
-    y = similar(x, T <: Real ? Complex{T} : T)
+function Base.:*(p::FFTAPlan{T,1}, x::AbstractVector{T}) where {T<:Complex}
+    y = similar(x)
     LinearAlgebra.mul!(y, p, x)
     y
 end
 
-function Base.:*(p::FFTAPlan{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
-    y = similar(x, T <: Real ? Complex{T} : T)
+function Base.:*(p::FFTAPlan{T,N1}, x::AbstractArray{T,N2}) where {T<:Complex, N1, N2}
+    y = similar(x)
     LinearAlgebra.mul!(y, p, x)
     y
 end
 
-function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Union{Real, Complex}}
-    if p.dir == FFT_FORWARD
-        y = similar(x, T <: Real ? Complex{T} : T)
-        LinearAlgebra.mul!(y, p, x)
+function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:Real}
+    if p.dir === FFT_FORWARD
+        x_c = Vector{Complex{T}}(x)
+        y = similar(x_c)
+        LinearAlgebra.mul!(y, p, x_c)
         return y[1:end÷2 + 1]
-    else
+    end
+    throw(ArgumentError("only FFT_FORWARD supported for real vectors"))
+end
+function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
+    if p.dir === FFT_BACKWARD
         x_tmp = similar(x, p.flen)
         x_tmp[1:end÷2 + 1] .= x
         x_tmp[end÷2 + 2:end] .= iseven(p.flen) ? conj.(x[end-1:-1:2]) : conj.(x[end:-1:2])
         y = similar(x_tmp)
         LinearAlgebra.mul!(y, p, x_tmp)
-        return y
+        return real(y)
     end
+    throw(ArgumentError("only FFT_BACKWARD supported for complex vectors"))
 end
 
-
-function Base.:*(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Union{Real, Complex}, N1, N2}
-  half_1 = 1:(p.flen ÷ 2 + 1)
-  if p.dir == FFT_FORWARD
-    y = similar(x, T <: Real ? Complex{T} : T)
-    LinearAlgebra.mul!(y, p, x)
-    return copy(selectdim(y, p.region[1], half_1))
-  else
-    res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
-    # for the inverse transformation we have to reconstruct the full array
-    x_full = similar(x, res_size)
-    half_2 = half_1[end]+1:p.flen
-    # use first half as is
-    copy!(selectdim(x_full, p.region[1], half_1), x)
-    start_reverse = size(x, p.region[1]) - iseven(p.flen)
-    half_reverse = (start_reverse:-1:2)
-    # the second half is reversed and conjugated
-    map!(conj, selectdim(x_full, p.region[1], half_2), selectdim(x, p.region[1], half_reverse))
-    y = similar(x_full)
-    LinearAlgebra.mul!(y, p, x_full)
-    return y
-  end
+function Base.:*(p::FFTAPlan_re{Complex{T},N1}, x::AbstractArray{T,N2}) where {T<:Real, N1, N2}
+    half_1 = 1:(p.flen ÷ 2 + 1)
+    if p.dir === FFT_FORWARD
+        x_c = Array{Complex{T}}(x)
+        y = similar(x_c)
+        LinearAlgebra.mul!(y, p, x_c)
+        return copy(selectdim(y, p.region[1], half_1))
+    end
+    throw(ArgumentError("only FFT_FORWARD supported for real arrays"))
+end
+function Base.:*(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Complex, N1, N2}
+    half_1 = 1:(p.flen ÷ 2 + 1)
+    if p.dir === FFT_BACKWARD
+        res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
+        # for the inverse transformation we have to reconstruct the full array
+        x_full = similar(x, res_size)
+        half_2 = half_1[end]+1:p.flen
+        # use first half as is
+        copy!(selectdim(x_full, p.region[1], half_1), x)
+        start_reverse = size(x, p.region[1]) - iseven(p.flen)
+        half_reverse = (start_reverse:-1:2)
+        # the second half is reversed and conjugated
+        map!(conj, selectdim(x_full, p.region[1], half_2), selectdim(x, p.region[1], half_reverse))
+        y = similar(x_full)
+        LinearAlgebra.mul!(y, p, x_full)
+        return real(y)
+    end
+    throw(ArgumentError("only FFT_BACKWARD supported for complex arrays"))
 end

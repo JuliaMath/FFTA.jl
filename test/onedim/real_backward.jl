@@ -9,6 +9,7 @@ using FFTA, Test, LinearAlgebra
         println(norm(y_ref - y))
     end
     @test y_ref ≈ y atol=1e-12
+    @test y isa Vector{<:Real}
 end
 
 @testset "More backward tests. Size: $n" for n in 1:64
@@ -22,11 +23,13 @@ end
     end
 
     @testset "against naive implementation" begin
-        @test naive_1d_fourier_transform(xe, FFTA.FFT_BACKWARD) ≈ brfft(x, n)
+        new_x = brfft(x, n)
+        @test naive_1d_fourier_transform(xe, FFTA.FFT_BACKWARD) ≈ new_x
+        @test new_x isa Array{<:Real}
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations brfft(x, n)) <= 53
+        @test (@test_allocations brfft(x, n)) <= 55
     end
 end
 
