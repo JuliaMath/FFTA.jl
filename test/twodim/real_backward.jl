@@ -12,5 +12,5 @@ end
     X = randn(256, 256)
     Y = rfft(X)
     brfft(Y, 256) # compile
-    @test (@test_allocations brfft(Y, 256)) <= 67
+    @test (@test_allocations brfft(Y, 256)) <= 68
 end

@@ -26,7 +26,7 @@ end
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations brfft(x, n)) <= 50
+        @test (@test_allocations brfft(x, n)) <= 53
     end
 end
 

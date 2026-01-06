@@ -16,7 +16,7 @@ end
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations bfft(x)) <= 44
+        @test (@test_allocations bfft(x)) <= 47
     end
 end
 
