@@ -20,7 +20,7 @@ import ExplicitImports
     # No non-public accesses in FFTA (ie. no `... MyPkg._non_public_internal_func(...)`)
     # AbstractFFTs requires subtyping of `Plan` but it is not public
     # This is an upstream bug in AbstractFFTs.jl
-    @test ExplicitImports.check_all_qualified_accesses_are_public(FFTA; ignore = (:Plan,)) === nothing
+    @test ExplicitImports.check_all_qualified_accesses_are_public(FFTA; ignore = (:Plan, :require_one_based_indexing)) === nothing
 
     # No self-qualified accesses in FFTA (ie. no `... FFTA.func(...)`)
     @test ExplicitImports.check_no_self_qualified_accesses(FFTA) === nothing

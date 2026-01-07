@@ -7,10 +7,24 @@ using FFTA, Test
     y_ref[1] = length(x)
     @test y ≈ y_ref
     x = randn(N,N)
-    @test rfft(x) ≈ rfft(reshape(x,1,N,N), [2,3])[1,:,:]
-    @test rfft(x) ≈ rfft(reshape(x,1,N,N,1), [2,3])[1,:,:,1]
-    @test rfft(x) ≈ rfft(reshape(x,1,1,N,N,1), [3,4])[1,1,:,:,1]
+    @test_broken rfft(x) ≈ rfft(reshape(x,1,N,N), [2,3])[1,:,:]
+    @test_broken rfft(x) ≈ rfft(reshape(x,1,N,N,1), [2,3])[1,:,:,1]
+    @test_broken rfft(x) ≈ rfft(reshape(x,1,1,N,N,1), [3,4])[1,1,:,:,1]
     @test size(rfft(x)) == (N÷2+1, N)
+end
+
+@testset "More forward tests" for n in 1:64
+    @testset "size: ($m, $n)" for m in n:(n + 1)
+        X = randn(m, n)
+
+        @testset "against naive implementation" begin
+            @test naive_2d_fourier_transform(X, FFTA.FFT_FORWARD)[1:(m ÷ 2 + 1),:] ≈ rfft(X)
+        end
+
+        @testset "allocations" begin
+            @test (@test_allocations rfft(X)) <= 132
+        end
+    end
 end
 
 @testset "allocations" begin

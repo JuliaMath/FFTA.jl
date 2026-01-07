@@ -17,67 +17,71 @@ struct FFTAPlan_re{T,N} <: FFTAPlan{T,N}
     flen::Int
 end
 
-function AbstractFFTs.plan_fft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
-    N = length(region)
+function AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex, N}
+    FFTN = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
-    if N == 1
+    @assert FFTN <= 2 "Only supports 1D and 2D FFTs"
+    if FFTN == 1
         g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_cx{T,N}((g,), region, FFT_FORWARD, pinv)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_cx{T,FFTN}((g,), region, FFT_FORWARD, pinv)
     else
         sort!(region)
         g1 = CallGraph{T}(size(x,region[1]))
         g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_cx{T,N}((g1,g2), region, FFT_FORWARD, pinv)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_cx{T,FFTN}((g1,g2), region, FFT_FORWARD, pinv)
     end
 end
 
-function AbstractFFTs.plan_bfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex}
-    N = length(region)
+function AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex,N}
+    FFTN = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
-    if N == 1
+    @assert FFTN <= 2 "Only supports 1D and 2D FFTs"
+    if FFTN == 1
         g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_cx{T,N}((g,), region, FFT_BACKWARD, pinv)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_cx{T,FFTN}((g,), region, FFT_BACKWARD, pinv)
     else
         sort!(region)
         g1 = CallGraph{T}(size(x,region[1]))
         g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_cx{T,N}((g1,g2), region, FFT_BACKWARD, pinv)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_cx{T,FFTN}((g1,g2), region, FFT_BACKWARD, pinv)
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real}
-    N = length(region)
+function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real,N}
+    FFTN = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
-    if N == 1
+    @assert FFTN <= 2 "Only supports 1D and 2D FFTs"
+    if FFTN == 1
         g = CallGraph{Complex{T}}(size(x,region[]))
-        pinv = FFTAInvPlan{Complex{T},N}()
-        return FFTAPlan_re{Complex{T},N}(tuple(g), region, FFT_FORWARD, pinv, size(x,region[]))
+        pinv = FFTAInvPlan{Complex{T},FFTN}()
+        return FFTAPlan_re{Complex{T},FFTN}(tuple(g), region, FFT_FORWARD, pinv, size(x,region[]))
     else
         sort!(region)
         g1 = CallGraph{Complex{T}}(size(x,region[1]))
         g2 = CallGraph{Complex{T}}(size(x,region[2]))
-        pinv = FFTAInvPlan{Complex{T},N}()
-        return FFTAPlan_re{Complex{T},N}(tuple(g1,g2), region, FFT_FORWARD, pinv, size(x,region[1]))
+        pinv = FFTAInvPlan{Complex{T},FFTN}()
+        return FFTAPlan_re{Complex{T},FFTN}(tuple(g1,g2), region, FFT_FORWARD, pinv, size(x,region[1]))
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T}, len, region; kwargs...)::FFTAPlan_re{T} where {T}
-    N = length(region)
+function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region; kwargs...)::FFTAPlan_re{T} where {T,N}
+    FFTN = length(region)
     @assert N <= 2 "Only supports vectors and matrices"
-    if N == 1
+    @assert FFTN <= 2 "Only supports 1D and 2D FFTs"
+    if FFTN == 1
         g = CallGraph{T}(len)
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_re{T,N}((g,), region, FFT_BACKWARD, pinv, len)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_re{T,FFTN}((g,), region, FFT_BACKWARD, pinv, len)
     else
         sort!(region)
         g1 = CallGraph{T}(len)
         g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,N}()
-        return FFTAPlan_re{T,N}((g1,g2), region, FFT_BACKWARD, pinv, len)
+        pinv = FFTAInvPlan{T,FFTN}()
+        return FFTAPlan_re{T,FFTN}((g1,g2), region, FFT_BACKWARD, pinv, len)
     end
 end
 
@@ -94,6 +98,7 @@ function LinearAlgebra.mul!(y::AbstractVector{U}, p::FFTAPlan{T,1}, x::AbstractV
 end
 
 function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan{T,1}, x::AbstractArray{T,N}) where {T,U,N}
+    Base.require_one_based_indexing(x)
     Rpre = CartesianIndices(size(x)[1:p.region-1])
     Rpost = CartesianIndices(size(x)[p.region+1:end])
     for Ipre in Rpre
@@ -104,6 +109,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan{T,1}, x::Abstract
 end
 
 function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan{T,2}, x::AbstractArray{T,N}) where {T,U,N}
+    Base.require_one_based_indexing(x)
     R1 = CartesianIndices(size(x)[1:p.region[1]-1])
     R2 = CartesianIndices(size(x)[p.region[1]+1:p.region[2]-1])
     R3 = CartesianIndices(size(x)[p.region[2]+1:end])
@@ -154,8 +160,10 @@ function Base.:*(p::FFTAPlan{T,N1}, x::AbstractArray{T,N2}) where {T<:Complex, N
 end
 
 function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:Real}
+    Base.require_one_based_indexing(x)
     if p.dir === FFT_FORWARD
-        x_c = Vector{Complex{T}}(x)
+        x_c = similar(x, Complex{T})
+        copy!(x_c, x)
         y = similar(x_c)
         LinearAlgebra.mul!(y, p, x_c)
         return y[1:end÷2 + 1]
@@ -163,6 +171,7 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
     throw(ArgumentError("only FFT_FORWARD supported for real vectors"))
 end
 function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
+    Base.require_one_based_indexing(x)
     if p.dir === FFT_BACKWARD
         x_tmp = similar(x, p.flen)
         x_tmp[1:end÷2 + 1] .= x
@@ -174,29 +183,31 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
     throw(ArgumentError("only FFT_BACKWARD supported for complex vectors"))
 end
 
-function Base.:*(p::FFTAPlan_re{Complex{T},N1}, x::AbstractArray{T,N2}) where {T<:Real, N1, N2}
-    half_1 = 1:(p.flen ÷ 2 + 1)
+function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,2}) where {T<:Real}
+    Base.require_one_based_indexing(x)
     if p.dir === FFT_FORWARD
-        x_c = Array{Complex{T}}(x)
+        half_1 = 1:(p.flen ÷ 2 + 1)
+        x_c = similar(x, Complex{T})
+        copy!(x_c, x)
         y = similar(x_c)
         LinearAlgebra.mul!(y, p, x_c)
-        return copy(selectdim(y, p.region[1], half_1))
+        return y[half_1, :]
     end
     throw(ArgumentError("only FFT_FORWARD supported for real arrays"))
 end
-function Base.:*(p::FFTAPlan_re{T,N1}, x::AbstractArray{T,N2}) where {T<:Complex, N1, N2}
-    half_1 = 1:(p.flen ÷ 2 + 1)
+function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,2}) where {T<:Complex}
+    Base.require_one_based_indexing(x)
     if p.dir === FFT_BACKWARD
-        res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
         # for the inverse transformation we have to reconstruct the full array
-        x_full = similar(x, res_size)
+        m, n = size(x)
+        half_1 = 1:(p.flen ÷ 2 + 1)
         half_2 = half_1[end]+1:p.flen
-        # use first half as is
-        copy!(selectdim(x_full, p.region[1], half_1), x)
-        start_reverse = size(x, p.region[1]) - iseven(p.flen)
-        half_reverse = (start_reverse:-1:2)
-        # the second half is reversed and conjugated
-        map!(conj, selectdim(x_full, p.region[1], half_2), selectdim(x, p.region[1], half_reverse))
+        x_full = similar(x, p.flen, n)
+        x_full[1:m, :] = x
+        start_reverse = m - iseven(p.flen)
+        map!(conj, view(x_full, (m + 1):p.flen, 1), view(x, start_reverse:-1:2, 1))
+        map!(conj, view(x_full, half_2, 2:n), view(x, start_reverse:-1:2, n:-1:2))
+
         y = similar(x_full)
         LinearAlgebra.mul!(y, p, x_full)
         return real(y)
