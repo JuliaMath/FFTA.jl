@@ -7,7 +7,7 @@ using FFTA, Test
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
     @test_broken y == fft(reshape(x,1,1,N),3)[1,1,:]
-    @test y == fft(reshape(x,N,1),1)[:,1]
+    @test y == fft(reshape(x,N,1), 1)[:,1]
 end
 
 @testset "More forward tests. Size: $n" for n in 1:64
