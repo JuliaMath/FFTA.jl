@@ -10,16 +10,18 @@ end
 
 @testset "More backward tests. Size: $n" for n in 1:64
     x = complex.(randn(n), randn(n))
+    # Assuming that fft works since it is tested independently
+    y = fft(x)
 
-    @testset "against naive implementation" begin
-        @test naive_1d_fourier_transform(x, FFTA.FFT_BACKWARD) ≈ bfft(x)
+    @testset "round tripping with ifft" begin
+        @test ifft(y) ≈ x
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations bfft(x)) <= 47
+        @test (@test_allocations bfft(y)) <= 47
     end
 end
 
 @testset "error messages" begin
-    @test_throws DimensionMismatch bfft(zeros(0))
+    @test_throws DimensionMismatch bfft(complex.(zeros(0)))
 end

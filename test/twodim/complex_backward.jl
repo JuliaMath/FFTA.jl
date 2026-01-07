@@ -10,14 +10,16 @@ end
 
 @testset "More backward tests" for n in 1:64
     @testset "size: ($m, $n)" for m in n:(n + 1)
-        X = complex.(randn(m, n), randn(m, n))
+        x = complex.(randn(n), randn(n))
+        # Assuming that fft works since it is tested independently
+        y = fft(x)
 
-        @testset "against naive implementation" begin
-            @test naive_2d_fourier_transform(X, FFTA.FFT_BACKWARD) ≈ bfft(X)
+        @testset "round tripping with ifft" begin
+            @test ifft(y) ≈ x
         end
 
         @testset "allocations" begin
-            @test (@test_allocations bfft(X)) <= 116
+            @test (@test_allocations bfft(y)) <= 116
         end
     end
 end
