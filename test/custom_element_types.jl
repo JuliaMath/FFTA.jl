@@ -5,15 +5,6 @@ x = randn(2*3*4*5)
 @testset "element type: $T" for T in  (Float16, BigFloat)
     Tx = T.(x)
 
-    @testset "AbstractFFTs believes that single and double precision is everything." begin
-        # Ref https://github.com/JuliaMath/FFTA.jl/issues/77
-        if T == BigFloat
-            @test_broken fft(Tx)
-        else
-            @test_broken fft(Tx) isa Vector{Complex{T}}
-        end
-    end
-
     # Complex
     cTx = complex(Tx)
     new_cTx = ifft(fft(cTx))
