@@ -12,7 +12,7 @@ using FFTA, Test, LinearAlgebra
     @test y isa Vector{<:Real}
 end
 
-@testset "More backward tests. Size: $n" for n in 1:64
+@testset "1D plan, 1D array. Size: $n" for n in 1:64
     x = randn(n)
     # Assuming that rfft works since it is tested separately
     y = rfft(x)
@@ -23,6 +23,15 @@ end
 
     @testset "allocation regression" begin
         @test (@test_allocations brfft(y, n)) <= 55
+    end
+end
+
+@testset "1D plan, ND array. Size: $n" for n in 1:64
+    x = randn(n, n + 1, n + 2)
+
+    @testset "against 1D array with mapslices, r=$r" for r in 1:3
+        y = rfft(x, r)
+        @test brfft(y, size(x, r), r) == mapslices(t -> brfft(t, size(x, r)), y; dims = r)
     end
 end
 
