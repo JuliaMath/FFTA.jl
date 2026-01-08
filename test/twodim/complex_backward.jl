@@ -8,7 +8,7 @@ using FFTA, Test
     @test y ≈ y_ref
 end
 
-@testset "More backward tests" for n in 1:64
+@testset "2D plan, 2D array. Size: $n" for n in 1:64
     @testset "size: ($m, $n)" for m in n:(n + 1)
         x = complex.(randn(n), randn(n))
         # Assuming that fft works since it is tested independently
@@ -21,6 +21,14 @@ end
         @testset "allocations" begin
             @test (@test_allocations bfft(y)) <= 116
         end
+    end
+end
+
+@testset "2D plan, ND array. Size: $n" for n in 1:64
+    x = complex.(randn(n, n + 1, n + 2), randn(n, n + 1, n + 2))
+
+    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+        @test bfft(x, r) == mapslices(bfft, x; dims = r)
     end
 end
 

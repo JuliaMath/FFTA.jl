@@ -1,15 +1,6 @@
 using Test, FFTA
 using LinearAlgebra: LinearAlgebra
 
-@testset "2D FFT only supported for 2D arrays" begin
-    xr = zeros(2, 2, 2)
-    xc = complex(xr)
-    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_fft(xc, 2:3)
-    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_bfft(xc, 2:3)
-    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_rfft(xr, 2:3)
-    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_brfft(xc, 2, 2:3)
-end
-
 @testset "Only 1D and 2D FFTs" begin
     xr = zeros(2, 2)
     xc = complex(xr)
@@ -90,4 +81,11 @@ end
             @test_throws DimensionMismatch LinearAlgebra.mul!(y2, plan_fft(x2), x2)
         end
     end
+end
+
+@testset "2D real FFT only supported for 2D arrays" begin
+    xr = zeros(2, 2, 2)
+    xc = complex(xr)
+    @test_throws ArgumentError("2D real FFT only supported for 2D arrays") plan_rfft(xr, 2:3)
+    @test_throws ArgumentError("2D real FFT only supported for 2D arrays") plan_brfft(xc, 2, 2:3)
 end

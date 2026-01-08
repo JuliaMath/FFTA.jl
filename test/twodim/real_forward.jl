@@ -13,7 +13,7 @@ using FFTA, Test
     @test size(rfft(x)) == (N÷2+1, N)
 end
 
-@testset "More forward tests" for n in 1:64
+@testset "2D plan, 2D array. Size: $n" for n in 1:64
     @testset "size: ($m, $n)" for m in n:(n + 1)
         X = randn(m, n)
 
@@ -24,6 +24,14 @@ end
         @testset "allocations" begin
             @test (@test_allocations rfft(X)) <= 132
         end
+    end
+end
+
+@testset "2D plan, ND array. Size: $n" for n in 1:64
+    x = randn(n, n + 1, n + 2)
+
+    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+        @test_broken rfft(x, r) == mapslices(rfft, x; dims = r)
     end
 end
 
