@@ -8,7 +8,7 @@ using FFTA, Test
     @test y ≈ y_ref atol=1e-12
 end
 
-@testset "More backward tests. Size: $n" for n in 1:64
+@testset "1D plan, 1D array. Size: $n" for n in 1:64
     x = complex.(randn(n), randn(n))
     # Assuming that fft works since it is tested independently
     y = fft(x)
@@ -19,6 +19,14 @@ end
 
     @testset "allocation regression" begin
         @test (@test_allocations bfft(y)) <= 47
+    end
+end
+
+@testset "1D plan, ND array. Size: $n" for n in 1:64
+    x = complex.(randn(n, n + 1, n + 2), randn(n, n + 1, n + 2))
+
+    @testset "against 1D array with mapslices, r=$r" for r in 1:3
+        @test bfft(x, r) == mapslices(bfft, x; dims = r)
     end
 end
 

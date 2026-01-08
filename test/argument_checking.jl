@@ -1,13 +1,13 @@
 using Test, FFTA
 using LinearAlgebra: LinearAlgebra
 
-@testset "Only vectors and matrices" begin
+@testset "2D FFT only supported for 2D arrays" begin
     xr = zeros(2, 2, 2)
     xc = complex(xr)
-    @test_throws ArgumentError("only supports vectors and matrices") plan_fft(xc)
-    @test_throws ArgumentError("only supports vectors and matrices") plan_bfft(xc)
-    @test_throws ArgumentError("only supports vectors and matrices") plan_rfft(xr)
-    @test_throws ArgumentError("only supports vectors and matrices") plan_brfft(xc, 2)
+    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_fft(xc, 2:3)
+    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_bfft(xc, 2:3)
+    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_rfft(xr, 2:3)
+    @test_throws ArgumentError("2D FFT only supported for 2D arrays") plan_brfft(xc, 2, 2:3)
 end
 
 @testset "Only 1D and 2D FFTs" begin
@@ -42,21 +42,19 @@ end
         xr2p = [[xr2; ones(1, size(xr2, 2))] ones(size(xr2, 1) + 1, 1)]
         xc2p = [[xc2; ones(1, size(xr2, 2))] ones(size(xc2, 1) + 1, 1)]
 
-        @testset "1D plan, region=$(region)" for region in [1, 2]
-            # Currently broken/not supported
-            @test_broken rfft(xr2, region)
-            # yr2 = rfft(xr2, region)
+        @testset "1D plan, region=$(region)" for region in 1:2
+            yr2 = rfft(xr2, region)
 
-            # yr2p = if region == 1
-            #     [yr2; ones(1, size(yr2, 2))]
-            # else
-            #     [yr2 ones(size(yr2, 1), 1)]
-            # end
+            yr2p = if region == 1
+                [yr2; ones(1, size(yr2, 2))]
+            else
+                [yr2 ones(size(yr2, 1), 1)]
+            end
 
             @test_throws DimensionMismatch plan_fft(xc2, region) * xc2p
             @test_throws DimensionMismatch plan_bfft(xc2, region) * xc2p
-            # @test_throws DimensionMismatch plan_rfft(xr2, region) * xr2p
-            # @test_throws DimensionMismatch plan_brfft(yr2, length(xr2), region) * yr2p
+            @test_throws DimensionMismatch plan_rfft(xr2, region) * xr2p
+            @test_throws DimensionMismatch plan_brfft(yr2, size(xr2, region), region) * yr2p
         end
 
         @testset "2D plan" begin
