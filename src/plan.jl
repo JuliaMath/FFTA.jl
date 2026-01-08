@@ -31,9 +31,6 @@ function AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPl
         pinv = FFTAInvPlan{T,FFTN}()
         return FFTAPlan_cx{T,FFTN}((g,), region, FFT_FORWARD, pinv)
     elseif FFTN == 2
-        if N !== 2
-            throw(ArgumentError("2D FFT only supported for 2D arrays"))
-        end
         sort!(region)
         g1 = CallGraph{T}(size(x,region[1]))
         g2 = CallGraph{T}(size(x,region[2]))
@@ -51,9 +48,6 @@ function AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAP
         pinv = FFTAInvPlan{T,FFTN}()
         return FFTAPlan_cx{T,FFTN}((g,), region, FFT_BACKWARD, pinv)
     elseif FFTN == 2
-        if N !== 2
-            throw(ArgumentError("2D FFT only supported for 2D arrays"))
-        end
         sort!(region)
         g1 = CallGraph{T}(size(x,region[1]))
         g2 = CallGraph{T}(size(x,region[2]))
@@ -72,7 +66,7 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAP
         return FFTAPlan_re{Complex{T},FFTN}(tuple(g), region, FFT_FORWARD, pinv, size(x,region[]))
     elseif FFTN == 2
         if N !== 2
-            throw(ArgumentError("2D FFT only supported for 2D arrays"))
+            throw(ArgumentError("2D real FFT only supported for 2D arrays"))
         end
         sort!(region)
         g1 = CallGraph{Complex{T}}(size(x,region[1]))
@@ -92,7 +86,7 @@ function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region; kwargs...):
         return FFTAPlan_re{T,FFTN}((g,), region, FFT_BACKWARD, pinv, len)
     elseif FFTN == 2
         if N !== 2
-            throw(ArgumentError("2D FFT only supported for 2D arrays"))
+            throw(ArgumentError("2D real FFT only supported for 2D arrays"))
         end
         sort!(region)
         g1 = CallGraph{T}(len)
@@ -102,14 +96,6 @@ function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region; kwargs...):
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
-end
-
-function AbstractFFTs.plan_bfft(p::FFTAPlan_cx{T,N}) where {T,N}
-    return FFTAPlan_cx{T,N}(p.callgraph, p.region, -p.dir, p.pinv)
-end
-
-function AbstractFFTs.plan_brfft(p::FFTAPlan_re{T,N}) where {T,N}
-    return FFTAPlan_re{T,N}(p.callgraph, p.region, -p.dir, p.pinv, p.flen)
 end
 
 
