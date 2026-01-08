@@ -86,4 +86,7 @@ Random.seed!(1)
             end
         end
     end
+    @testset verbose = true "Custom element types" begin
+        include("custom_element_types.jl")
+    end
 end
