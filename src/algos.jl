@@ -18,8 +18,8 @@ function fft!(out::AbstractVector{T}, in::AbstractVector{T}, start_out::Int, sta
             if t === pow2FFT
                 fft_pow2!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d))
             elseif t === pow3FFT
-                p_120 = convert(T, cispi(2/3))
-                m_120 = convert(T, cispi(4/3))
+                p_120 = cispi(T(2)/3)
+                m_120 = cispi(T(4)/3)
                 _p_120, _m_120 = d == FFT_FORWARD ? (p_120, m_120) : (m_120, p_120)
                 fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, _conj(root.w, d), _m_120, _p_120)
             elseif t === pow4FFT

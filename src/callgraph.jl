@@ -69,7 +69,7 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
     if N == 0
         throw(DimensionMismatch("array has to be non-empty"))
     end
-    w = convert(T, cispi(2/N))
+    w = cispi(T(2)/N)
     if iseven(N)
         pow = _ispow24(N)
         if !isnothing(pow)
