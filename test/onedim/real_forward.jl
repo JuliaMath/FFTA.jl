@@ -6,8 +6,8 @@ using FFTA, Test
     y_ref = 0*y
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
-    @test y == rfft(reshape(x,1,1,N),3)[1,1,:]
-    @test y == rfft(reshape(x,N,1),1)[:,1]
+    @test y == rfft(reshape(x, 1, 1, N), (3,))[1,1,:]
+    @test y == rfft(reshape(x, N, 1), (1,))[:,1]
 end
 
 @testset "1D plan, 1D array. Size: $n" for n in 1:64
@@ -33,7 +33,7 @@ end
     x = randn(n, n + 1, n + 2)
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
-        @test rfft(x, r) == mapslices(rfft, x; dims = r)
+        @test rfft(x, (r,)) == mapslices(rfft, x; dims = r)
     end
 end
 

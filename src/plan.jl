@@ -1,18 +1,18 @@
 # Plans
-abstract type FFTAPlan{T,N} end
+abstract type FFTAPlan{T,D} end
 
-struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
+struct FFTAInvPlan{T,D} <: FFTAPlan{T,D} end
 
-struct FFTAPlan_cx{T,N} <: FFTAPlan{T,N}
-    callgraph::NTuple{N, CallGraph{T}}
-    region::Union{Int,AbstractVector{<:Int}}
+struct FFTAPlan_cx{T,D} <: FFTAPlan{T,D}
+    callgraph::NTuple{D, CallGraph{T}}
+    region::NTuple{D,Int}
     dir::Direction
     pinv::FFTAInvPlan{T}
 end
 
-struct FFTAPlan_re{T,N} <: FFTAPlan{T,N}
-    callgraph::NTuple{N, CallGraph{T}}
-    region::Union{Int,AbstractVector{<:Int}}
+struct FFTAPlan_re{T,D} <: FFTAPlan{T,D}
+    callgraph::NTuple{D, CallGraph{T}}
+    region::NTuple{D, Int}
     dir::Direction
     pinv::FFTAInvPlan{T}
     flen::Int
@@ -23,69 +23,65 @@ Base.size(p::FFTAPlan{<:Any,N}) where N = ntuple(Base.Fix1(size, p), Val{N}())
 
 Base.complex(p::FFTAPlan_re{T,N}) where {T,N} = FFTAPlan_cx{T,N}(p.callgraph, p.region, p.dir, p.pinv)
 
-function plan_fft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_cx{T} where {T <: Complex, N}
-    FFTN = length(region)
-    if FFTN == 1
-        g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN}((g,), region, FFT_FORWARD, pinv)
-    elseif FFTN == 2
-        sort!(region)
+function plan_fft(x::AbstractArray{T,N}, region::NTuple{D,Int} = ntuple(identity, N))::FFTAPlan_cx{T} where {T <: Complex, N, D}
+    if D == 1
+        g = CallGraph{T}(size(x, region[1]))
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_cx{T,D}((g,), region, FFT_FORWARD, pinv)
+    elseif D == 2
+        region = sort(region)
+        g1 = CallGraph{T}(size(x, region[1]))
+        g2 = CallGraph{T}(size(x, region[2]))
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_cx{T,D}((g1, g2), region, FFT_FORWARD, pinv)
+    else
+        throw(ArgumentError("only supports 1D and 2D FFTs"))
+    end
+end
+
+function plan_bfft(x::AbstractArray{T,N}, region::NTuple{D,Int} = ntuple(identity, N))::FFTAPlan_cx{T} where {T <: Complex, N, D}
+    if D == 1
+        g = CallGraph{T}(size(x, region[1]))
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_cx{T,D}((g,), region, FFT_BACKWARD, pinv)
+    elseif D == 2
+        region = sort(region)
         g1 = CallGraph{T}(size(x,region[1]))
         g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN}((g1,g2), region, FFT_FORWARD, pinv)
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_cx{T,D}((g1,g2), region, FFT_BACKWARD, pinv)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
 end
 
-function plan_bfft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_cx{T} where {T <: Complex,N}
-    FFTN = length(region)
-    if FFTN == 1
-        g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN}((g,), region, FFT_BACKWARD, pinv)
-    elseif FFTN == 2
-        sort!(region)
-        g1 = CallGraph{T}(size(x,region[1]))
-        g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN}((g1,g2), region, FFT_BACKWARD, pinv)
+function plan_rfft(x::AbstractArray{T,N}, region::NTuple{D,Int} = ntuple(identity, N))::FFTAPlan_re{Complex{T}} where {T <: Real, N, D}
+    if D == 1
+        g = CallGraph{Complex{T}}(size(x, region[1]))
+        pinv = FFTAInvPlan{Complex{T},D}()
+        return FFTAPlan_re{Complex{T},D}(tuple(g), region, FFT_FORWARD, pinv, size(x, region[1]))
+    elseif D == 2
+        region = sort(region)
+        g1 = CallGraph{Complex{T}}(size(x, region[1]))
+        g2 = CallGraph{Complex{T}}(size(x, region[2]))
+        pinv = FFTAInvPlan{Complex{T},D}()
+        return FFTAPlan_re{Complex{T},D}(tuple(g1,g2), region, FFT_FORWARD, pinv, size(x,region[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
 end
 
-function plan_rfft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_re{Complex{T}} where {T <: Real,N}
-    FFTN = length(region)
-    if FFTN == 1
-        g = CallGraph{Complex{T}}(size(x,region[]))
-        pinv = FFTAInvPlan{Complex{T},FFTN}()
-        return FFTAPlan_re{Complex{T},FFTN}(tuple(g), region, FFT_FORWARD, pinv, size(x,region[]))
-    elseif FFTN == 2
-        sort!(region)
-        g1 = CallGraph{Complex{T}}(size(x,region[1]))
-        g2 = CallGraph{Complex{T}}(size(x,region[2]))
-        pinv = FFTAInvPlan{Complex{T},FFTN}()
-        return FFTAPlan_re{Complex{T},FFTN}(tuple(g1,g2), region, FFT_FORWARD, pinv, size(x,region[1]))
-    else
-        throw(ArgumentError("only supports 1D and 2D FFTs"))
-    end
-end
-
-function plan_brfft(x::AbstractArray{T,N}, len::Int, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_re{T} where {T,N}
-    FFTN = length(region)
-    if FFTN == 1
+function plan_brfft(x::AbstractArray{T,N}, len::Int, region::NTuple{D,Int} = ntuple(identity, N))::FFTAPlan_re{T} where {T, N, D}
+    if D == 1
         g = CallGraph{T}(len)
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_re{T,FFTN}((g,), region, FFT_BACKWARD, pinv, len)
-    elseif FFTN == 2
-        sort!(region)
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_re{T,D}((g,), region, FFT_BACKWARD, pinv, len)
+    elseif D == 2
+        region = sort(region)
         g1 = CallGraph{T}(len)
-        g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_re{T,FFTN}((g1,g2), region, FFT_BACKWARD, pinv, len)
+        g2 = CallGraph{T}(size(x, region[2]))
+        pinv = FFTAInvPlan{T,D}()
+        return FFTAPlan_re{T,D}((g1,g2), region, FFT_BACKWARD, pinv, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -110,11 +106,11 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
     if axes(x) != axes(y)
         throw(DimensionMismatch("input array has axes $(axes(x)), but output array has axes $(axes(y))"))
     end
-    if size(p, 1) != size(x, p.region[])
-        throw(DimensionMismatch("plan has size $(size(p, 1)), but input array has size $(size(x, p.region[])) along region $(p.region[])"))
+    if size(p, 1) != size(x, p.region[1])
+        throw(DimensionMismatch("plan has size $(size(p, 1)), but input array has size $(size(x, p.region[1])) along region $(p.region[1])"))
     end
-    Rpre = CartesianIndices(size(x)[1:p.region[]-1])
-    Rpost = CartesianIndices(size(x)[p.region[]+1:end])
+    Rpre = CartesianIndices(size(x)[1:p.region[1]-1])
+    Rpost = CartesianIndices(size(x)[p.region[1]+1:end])
     for Ipre in Rpre
         for Ipost in Rpost
             @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
@@ -136,8 +132,8 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,2}, x::Abstr
     R1 = CartesianIndices(size(x)[1:p.region[1]-1])
     R2 = CartesianIndices(size(x)[p.region[1]+1:p.region[2]-1])
     R3 = CartesianIndices(size(x)[p.region[2]+1:end])
-    y_tmp = similar(y, axes(y)[p.region])
-    rows,cols = size(x)[p.region]
+    y_tmp = similar(y, (axes(y, p.region[1]), axes(y, p.region[2])))
+    rows, cols = size(x, p.region[1]), size(x, p.region[2])
     # Introduce function barrier here since the variables used in the loop ranges aren't inferred. This
     # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
     # it might be a bit tricky to construct the Rxs in an inferred way.
@@ -232,8 +228,8 @@ end
 ##### Backward
 function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractArray{T,N}) where {T<:Complex, N}
     Base.require_one_based_indexing(x)
-    if p.flen ÷ 2 + 1 != size(x, p.region[])
-        throw(DimensionMismatch("real 1D plan has size $(p.flen). Dimension of input array along region $(p.region[]) should have size $(size(p, p.region[]) ÷ 2 + 1), but has size $(size(x, p.region[]))"))
+    if p.flen ÷ 2 + 1 != size(x, p.region[1])
+        throw(DimensionMismatch("real 1D plan has size $(p.flen). Dimension of input array along region $(p.region[1]) should have size $(size(p, p.region[1]) ÷ 2 + 1), but has size $(size(x, p.region[1]))"))
     end
     if p.dir === FFT_BACKWARD
         # # for the inverse transformation we have to reconstruct the full array
@@ -288,7 +284,7 @@ function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex, 
         # the second half in the first transform dimension is reversed and conjugated
         x_half_2 = selectdim(x_full, p.region[1], half_2) # view to the second half of x
         start_reverse = size(x, p.region[1]) - iseven(p.flen)
-        
+
         map!(conj, x_half_2, selectdim(x, p.region[1], start_reverse:-1:2))
         # for the 2D transform we have to reverse index 2:end of the same block in the second transform dimension as well
         reverse!(selectdim(x_half_2, p.region[2], 2:size(x, p.region[2])), dims=p.region[2])
