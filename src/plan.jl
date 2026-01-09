@@ -120,8 +120,8 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
     if size(p, 1) != size(x, p.region[])
         throw(DimensionMismatch("plan has size $(size(p, 1)), but input array has size $(size(x, p.region[])) along region $(p.region[])"))
     end
-    Rpre = CartesianIndices(size(x)[1:p.region-1])
-    Rpost = CartesianIndices(size(x)[p.region+1:end])
+    Rpre = CartesianIndices(size(x)[1:p.region[]-1])
+    Rpost = CartesianIndices(size(x)[p.region[]+1:end])
     for Ipre in Rpre
         for Ipost in Rpost
             @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
