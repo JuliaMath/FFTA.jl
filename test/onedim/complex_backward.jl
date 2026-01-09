@@ -27,7 +27,7 @@ end
     x = complex.(randn(n, n + 1, n + 2), randn(n, n + 1, n + 2))
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
-        @test bfft(x, r) == mapslices(bfft, x; dims = r)
+        @test bfft(x, (r,)) == mapslices(bfft, x; dims = r)
     end
 end
 

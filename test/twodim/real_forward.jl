@@ -7,9 +7,9 @@ using FFTA, Test
     y_ref[1] = length(x)
     @test y ≈ y_ref
     x = randn(N,N)
-    @test rfft(x) ≈ rfft(reshape(x,1,N,N), [2,3])[1,:,:]
-    @test rfft(x) ≈ rfft(reshape(x,1,N,N,1), [2,3])[1,:,:,1]
-    @test rfft(x) ≈ rfft(reshape(x,1,1,N,N,1), [3,4])[1,1,:,:,1]
+    @test rfft(x) ≈ rfft(reshape(x ,1, N, N), (2, 3))[1,:,:]
+    @test rfft(x) ≈ rfft(reshape(x, 1, N, N, 1), (2, 3))[1,:,:,1]
+    @test rfft(x) ≈ rfft(reshape(x, 1, 1, N, N, 1), (3, 4))[1,1,:,:,1]
     @test size(rfft(x)) == (N÷2+1, N)
 end
 
@@ -30,8 +30,8 @@ end
 @testset "2D plan, ND array. Size: $n" for n in 1:64
     x = randn(n, n + 1, n + 2)
 
-    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
-        @test rfft(x, r) == mapslices(rfft, x; dims = r)
+    @testset "against 1D array with mapslices, r=$r" for r in [(1,2), (1,3), (2,3)]
+        @test rfft(x, r) == mapslices(rfft, x; dims = [r...])
     end
 end
 

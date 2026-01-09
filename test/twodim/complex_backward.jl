@@ -27,8 +27,8 @@ end
 @testset "2D plan, ND array. Size: $n" for n in 1:64
     x = complex.(randn(n, n + 1, n + 2), randn(n, n + 1, n + 2))
 
-    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
-        @test bfft(x, r) == mapslices(bfft, x; dims = r)
+    @testset "against 1D array with mapslices, r=$r" for r in [(1,2), (1,3), (2,3)]
+        @test bfft(x, r) == mapslices(bfft, x; dims = [r...])
     end
 end
 

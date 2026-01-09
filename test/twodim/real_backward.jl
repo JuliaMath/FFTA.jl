@@ -27,13 +27,13 @@ end
 @testset "2D plan, ND array. Size: $n" for n in 1:64
     x = randn(n, n + 1, n + 2)
 
-    @testset "round trip with irfft, r=$r" for r in [[1,2], [1,3], [2,3]]
-        @test x ≈ irfft(rfft(x,r), size(x,r[1]), r)
+    @testset "round trip with irfft, r=$r" for r in [(1,2), (1,3), (2,3)]
+        @test x ≈ irfft(rfft(x, r), size(x, r[1]), r)
     end
 
-    @testset "against 2D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+    @testset "against 2D array with mapslices, r=$r" for r in [(1,2), (1,3), (2,3)]
         y = rfft(x, r)
-        @test brfft(y, size(x, r[1]), r) == mapslices(t -> brfft(t, size(x, r[1])), y; dims = r)
+        @test brfft(y, size(x, r[1]), r) == mapslices(t -> brfft(t, size(x, r[1])), y; dims = [r...])
     end
 end
 
