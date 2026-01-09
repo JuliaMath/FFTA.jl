@@ -65,9 +65,6 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAP
         pinv = FFTAInvPlan{Complex{T},FFTN}()
         return FFTAPlan_re{Complex{T},FFTN}(tuple(g), region, FFT_FORWARD, pinv, size(x,region[]))
     elseif FFTN == 2
-        if N !== 2
-            throw(ArgumentError("2D real FFT only supported for 2D arrays"))
-        end
         sort!(region)
         g1 = CallGraph{Complex{T}}(size(x,region[1]))
         g2 = CallGraph{Complex{T}}(size(x,region[2]))
@@ -85,9 +82,6 @@ function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region; kwargs...):
         pinv = FFTAInvPlan{T,FFTN}()
         return FFTAPlan_re{T,FFTN}((g,), region, FFT_BACKWARD, pinv, len)
     elseif FFTN == 2
-        if N !== 2
-            throw(ArgumentError("2D real FFT only supported for 2D arrays"))
-        end
         sort!(region)
         g1 = CallGraph{T}(len)
         g2 = CallGraph{T}(size(x,region[2]))
@@ -262,9 +256,9 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractArray{T,N}) where {T<:Complex, 
     throw(ArgumentError("only FFT_BACKWARD supported for complex arrays"))
 end
 
-#### 2D plan 2D array
+#### 2D plan ND array
 ##### Forward
-function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,2}) where {T<:Real}
+function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,N}) where {T<:Real, N}
     Base.require_one_based_indexing(x)
     if p.dir === FFT_FORWARD
         half_1 = 1:(p.flen ÷ 2 + 1)
@@ -272,27 +266,33 @@ function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,2}) where {T<:
         copy!(x_c, x)
         y = similar(x_c)
         LinearAlgebra.mul!(y, complex(p), x_c)
-        return y[half_1, :]
+        return copy(selectdim(y, p.region[1], half_1))
     end
     throw(ArgumentError("only FFT_FORWARD supported for real arrays"))
 end
 
 ##### Backward
-function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,2}) where {T<:Complex}
+function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex, N}
     Base.require_one_based_indexing(x)
-    if size(p, 1) ÷ 2 + 1 != size(x, 1)
-        throw(DimensionMismatch("real 2D plan has size $(size(p)). First dimension of input array should have size ($(size(p, 1) ÷ 2 + 1)), but has size $(size(x, 1))"))
+    if size(p, 1) ÷ 2 + 1 != size(x, p.region[1])
+        throw(DimensionMismatch("real 2D plan has size $(size(p)). First transform dimension of input array should have size ($(size(p, 1) ÷ 2 + 1)), but has size $(size(x, p.region[1]))"))
     end
     if p.dir === FFT_BACKWARD
+        res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
         # for the inverse transformation we have to reconstruct the full array
-        m, n = size(x)
         half_1 = 1:(p.flen ÷ 2 + 1)
         half_2 = half_1[end]+1:p.flen
-        x_full = similar(x, p.flen, n)
-        x_full[1:m, :] = x
-        start_reverse = m - iseven(p.flen)
-        map!(conj, view(x_full, (m + 1):p.flen, 1), view(x, start_reverse:-1:2, 1))
-        map!(conj, view(x_full, half_2, 2:n), view(x, start_reverse:-1:2, n:-1:2))
+        x_full = similar(x, res_size)
+        # use first half as is
+        copy!(selectdim(x_full, p.region[1], half_1), x)
+
+        # the second half in the first transform dimension is reversed and conjugated
+        x_half_2 = selectdim(x_full, p.region[1], half_2) # view to the second half of x
+        start_reverse = size(x, p.region[1]) - iseven(p.flen)
+        
+        map!(conj, x_half_2, selectdim(x, p.region[1], start_reverse:-1:2))
+        # for the 2D transform we have to reverse index 2:end of the same block in the second transform dimension as well
+        reverse!(selectdim(x_half_2, p.region[2], 2:size(x, p.region[2])), dims=p.region[2])
 
         y = similar(x_full)
         LinearAlgebra.mul!(y, complex(p), x_full)
