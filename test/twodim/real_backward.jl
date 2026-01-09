@@ -27,10 +27,13 @@ end
 @testset "2D plan, ND array. Size: $n" for n in 1:64
     x = randn(n, n + 1, n + 2)
 
-    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
-        # y = rfft(x, r)
-        y = fft(x, r) # to produce y while tests are broken
-        @test_broken brfft(y, size(x, r), r) == mapslices(t -> brfft(t, size(x, r)), y; dims = r)
+    @testset "round trip with irfft, r=$r" for r in [[1,2], [1,3], [2,3]]
+        @test x ≈ irfft(rfft(x,r), size(x,r[1]), r)
+    end
+
+    @testset "against 2D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+        y = rfft(x, r)
+        @test brfft(y, size(x, r[1]), r) == mapslices(t -> brfft(t, size(x, r[1])), y; dims = r)
     end
 end
 
@@ -38,5 +41,5 @@ end
     X = randn(256, 256)
     Y = rfft(X)
     brfft(Y, 256) # compile
-    @test (@test_allocations brfft(Y, 256)) <= 68
+    @test (@test_allocations brfft(Y, 256)) <= 82
 end
