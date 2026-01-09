@@ -29,6 +29,10 @@ end
 @testset "1D plan, ND array. Size: $n" for n in 1:64
     x = randn(n, n + 1, n + 2)
 
+    @testset "round tripping with irfft, r=$r" for r in 1:3
+        @test irfft(rfft(x, r), size(x,r), r) ≈ x
+    end
+
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
         y = rfft(x, r)
         @test brfft(y, size(x, r), r) == mapslices(t -> brfft(t, size(x, r)), y; dims = r)
