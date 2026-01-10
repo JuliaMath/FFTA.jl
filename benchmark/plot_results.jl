@@ -10,7 +10,7 @@ import Pkg
 Pkg.instantiate()
 
 using JSON
-using Plots
+using PlotlyJS
 
 function plot_benchmark_results()
     # Load results
@@ -39,26 +39,15 @@ function plot_benchmark_results()
 
     # Category colors
     category_colors = Dict(
-        "odd_power_of_2" => :blue,
-        "even_power_of_2" => :red,
-        "power_of_3" => :green,
-        "composite" => :purple
+        "odd_power_of_2" => "blue",
+        "even_power_of_2" => "red",
+        "power_of_3" => "green",
+        "composite" => "purple"
     )
 
     # Create combined plot: Runtime/N vs N (all categories)
-    plt_combined = plot(
-        xlabel="Array Length (N)",
-        ylabel="Runtime / N (nanoseconds)",
-        title="FFT Performance: Runtime/N vs N (All Categories)",
-        xscale=:log10,
-        yscale=:log10,
-        legend=:outertopright,
-        grid=true,
-        size=(1200, 700),
-        dpi=150
-    )
+    traces = []
 
-    # Plot each category
     for category in categories
         # Filter data for this category
         ffta_cat = [d for d in ffta_data if get(d, "category", "") == category]
@@ -66,46 +55,50 @@ function plot_benchmark_results()
 
         if !isempty(ffta_cat)
             ffta_sizes = [d["size"] for d in ffta_cat]
-            ffta_runtime_per_n = [d["runtime_per_element"] for d in ffta_cat]
+            ffta_runtime_per_n = [d["runtime_per_element"] * 1e9 for d in ffta_cat]
 
-            plot!(
-                plt_combined,
-                ffta_sizes,
-                ffta_runtime_per_n .* 1e9,
-                label="FFTA: $(category_labels[category])",
-                marker=:circle,
-                markersize=5,
-                linewidth=2,
-                color=category_colors[category],
-                linestyle=:solid
-            )
+            push!(traces, scatter(
+                x=ffta_sizes,
+                y=ffta_runtime_per_n,
+                name="FFTA: $(category_labels[category])",
+                mode="lines+markers",
+                marker=attr(size=8, color=category_colors[category]),
+                line=attr(width=2, color=category_colors[category])
+            ))
         end
 
         if !isempty(fftw_cat)
             fftw_sizes = [d["size"] for d in fftw_cat]
-            fftw_runtime_per_n = [d["runtime_per_element"] for d in fftw_cat]
+            fftw_runtime_per_n = [d["runtime_per_element"] * 1e9 for d in fftw_cat]
 
-            plot!(
-                plt_combined,
-                fftw_sizes,
-                fftw_runtime_per_n .* 1e9,
-                label="FFTW: $(category_labels[category])",
-                marker=:square,
-                markersize=5,
-                linewidth=2,
-                color=category_colors[category],
-                linestyle=:dash
-            )
+            push!(traces, scatter(
+                x=fftw_sizes,
+                y=fftw_runtime_per_n,
+                name="FFTW: $(category_labels[category])",
+                mode="lines+markers",
+                marker=attr(size=8, symbol="square", color=category_colors[category]),
+                line=attr(width=2, dash="dash", color=category_colors[category])
+            ))
         end
     end
 
+    layout_combined = Layout(
+        title="FFT Performance: Runtime/N vs N (All Categories)",
+        xaxis=attr(title="Array Length (N)", type="log"),
+        yaxis=attr(title="Runtime / N (nanoseconds)", type="log"),
+        hovermode="closest",
+        width=1200,
+        height=700
+    )
+
+    plt_combined = plot(traces, layout_combined)
+
     # Save combined plot
     output_file = joinpath(@__DIR__, "performance_comparison_all.png")
-    savefig(plt_combined, output_file)
-    println("Combined plot saved to: $output_file")
+    savefig(plt_combined, output_file, width=1200, height=700, scale=2)
+    println("Combined plot saved to: ", output_file)
 
     # Create separate plots for each category
-    category_plots = []
     for category in categories
         ffta_cat = [d for d in ffta_data if get(d, "category", "") == category]
         fftw_cat = [d for d in fftw_data if get(d, "category", "") == category]
@@ -114,70 +107,55 @@ function plot_benchmark_results()
             continue
         end
 
-        plt_cat = plot(
-            xlabel="Array Length (N)",
-            ylabel="Runtime / N (nanoseconds)",
-            title="$(category_labels[category])",
-            xscale=:log10,
-            yscale=:log10,
-            legend=:best,
-            grid=true,
-            size=(600, 500),
-            dpi=150
-        )
+        cat_traces = []
 
         if !isempty(ffta_cat)
             ffta_sizes = [d["size"] for d in ffta_cat]
-            ffta_runtime_per_n = [d["runtime_per_element"] for d in ffta_cat]
+            ffta_runtime_per_n = [d["runtime_per_element"] * 1e9 for d in ffta_cat]
 
-            plot!(
-                plt_cat,
-                ffta_sizes,
-                ffta_runtime_per_n .* 1e9,
-                label="FFTA.jl",
-                marker=:circle,
-                markersize=6,
-                linewidth=2,
-                color=category_colors[category]
-            )
+            push!(cat_traces, scatter(
+                x=ffta_sizes,
+                y=ffta_runtime_per_n,
+                name="FFTA.jl",
+                mode="lines+markers",
+                marker=attr(size=10, color=category_colors[category]),
+                line=attr(width=2, color=category_colors[category])
+            ))
         end
 
         if !isempty(fftw_cat)
             fftw_sizes = [d["size"] for d in fftw_cat]
-            fftw_runtime_per_n = [d["runtime_per_element"] for d in fftw_cat]
+            fftw_runtime_per_n = [d["runtime_per_element"] * 1e9 for d in fftw_cat]
 
-            plot!(
-                plt_cat,
-                fftw_sizes,
-                fftw_runtime_per_n .* 1e9,
-                label="FFTW.jl",
-                marker=:square,
-                markersize=6,
-                linewidth=2,
-                color=:gray
-            )
+            push!(cat_traces, scatter(
+                x=fftw_sizes,
+                y=fftw_runtime_per_n,
+                name="FFTW.jl",
+                mode="lines+markers",
+                marker=attr(size=10, symbol="square", color="gray"),
+                line=attr(width=2, color="gray")
+            ))
         end
 
-        push!(category_plots, (category, plt_cat))
+        layout_cat = Layout(
+            title=category_labels[category],
+            xaxis=attr(title="Array Length (N)", type="log"),
+            yaxis=attr(title="Runtime / N (nanoseconds)", type="log"),
+            hovermode="closest",
+            width=600,
+            height=500
+        )
+
+        plt_cat = plot(cat_traces, layout_cat)
 
         # Save individual category plot
         cat_output = joinpath(@__DIR__, "performance_$(category).png")
-        savefig(plt_cat, cat_output)
-        println("Category plot saved to: $cat_output")
+        savefig(plt_cat, cat_output, width=600, height=500, scale=2)
+        println("Category plot saved to: ", cat_output)
     end
 
     # Create absolute runtime comparison
-    plt_absolute = plot(
-        xlabel="Array Length (N)",
-        ylabel="Runtime (microseconds)",
-        title="FFT Absolute Runtime Comparison",
-        xscale=:log10,
-        yscale=:log10,
-        legend=:outertopright,
-        grid=true,
-        size=(1200, 700),
-        dpi=150
-    )
+    abs_traces = []
 
     for category in categories
         ffta_cat = [d for d in ffta_data if get(d, "category", "") == category]
@@ -187,43 +165,48 @@ function plot_benchmark_results()
             ffta_sizes = [d["size"] for d in ffta_cat]
             ffta_times = [d["median_time"] * 1e6 for d in ffta_cat]
 
-            plot!(
-                plt_absolute,
-                ffta_sizes,
-                ffta_times,
-                label="FFTA: $(category_labels[category])",
-                marker=:circle,
-                markersize=5,
-                linewidth=2,
-                color=category_colors[category],
-                linestyle=:solid
-            )
+            push!(abs_traces, scatter(
+                x=ffta_sizes,
+                y=ffta_times,
+                name="FFTA: $(category_labels[category])",
+                mode="lines+markers",
+                marker=attr(size=8, color=category_colors[category]),
+                line=attr(width=2, color=category_colors[category])
+            ))
         end
 
         if !isempty(fftw_cat)
             fftw_sizes = [d["size"] for d in fftw_cat]
             fftw_times = [d["median_time"] * 1e6 for d in fftw_cat]
 
-            plot!(
-                plt_absolute,
-                fftw_sizes,
-                fftw_times,
-                label="FFTW: $(category_labels[category])",
-                marker=:square,
-                markersize=5,
-                linewidth=2,
-                color=category_colors[category],
-                linestyle=:dash
-            )
+            push!(abs_traces, scatter(
+                x=fftw_sizes,
+                y=fftw_times,
+                name="FFTW: $(category_labels[category])",
+                mode="lines+markers",
+                marker=attr(size=8, symbol="square", color=category_colors[category]),
+                line=attr(width=2, dash="dash", color=category_colors[category])
+            ))
         end
     end
 
+    layout_absolute = Layout(
+        title="FFT Absolute Runtime Comparison",
+        xaxis=attr(title="Array Length (N)", type="log"),
+        yaxis=attr(title="Runtime (microseconds)", type="log"),
+        hovermode="closest",
+        width=1200,
+        height=700
+    )
+
+    plt_absolute = plot(abs_traces, layout_absolute)
+
     output_file2 = joinpath(@__DIR__, "absolute_runtime_comparison.png")
-    savefig(plt_absolute, output_file2)
-    println("Absolute runtime plot saved to: $output_file2")
+    savefig(plt_absolute, output_file2, width=1200, height=700, scale=2)
+    println("Absolute runtime plot saved to: ", output_file2)
 
     # Print summary statistics
-    println("\n" * "=" ^ 70)
+    println("\n", "=" ^ 70)
     println("Performance Summary by Category")
     println("=" ^ 70)
 
@@ -235,7 +218,7 @@ function plot_benchmark_results()
             continue
         end
 
-        println("\n$(category_labels[category]):")
+        println("\n", category_labels[category], ":")
         println("-" ^ 70)
 
         all_sizes = sort(unique(vcat([d["size"] for d in ffta_cat], [d["size"] for d in fftw_cat])))
@@ -249,20 +232,20 @@ function plot_benchmark_results()
                 fftw_time = fftw_cat[fftw_entry]["median_time"] * 1e6
                 speedup = fftw_time / ffta_time
 
-                println("  N = $n:")
-                println("    FFTA: $(round(ffta_time, digits=3)) μs")
-                println("    FFTW: $(round(fftw_time, digits=3)) μs")
+                println("  N = ", n, ":")
+                println("    FFTA: ", round(ffta_time, digits=3), " μs")
+                println("    FFTW: ", round(fftw_time, digits=3), " μs")
                 if speedup > 1
-                    println("    FFTA is $(round(speedup, digits=2))x faster")
+                    println("    FFTA is ", round(speedup, digits=2), "x faster")
                 else
-                    println("    FFTW is $(round(1/speedup, digits=2))x faster")
+                    println("    FFTW is ", round(1/speedup, digits=2), "x faster")
                 end
             end
         end
     end
-    println("\n" * "=" ^ 70)
+    println("\n", "=" ^ 70)
 
-    return plt_combined, plt_absolute, category_plots
+    return plt_combined, plt_absolute
 end
 
 # Run plotting

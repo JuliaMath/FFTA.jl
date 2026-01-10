@@ -175,7 +175,7 @@ jobs:
               }
 
               comment += '\n📈 **[Download detailed HTML report and plots from artifacts]';
-              comment += `(${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**\n';
+              comment += '(${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**\n';
               comment += '\n---\n';
               comment += '*Benchmarks run with BenchmarkTools.jl (100 samples, 10 evaluations per sample)*';
 
