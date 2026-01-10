@@ -116,7 +116,6 @@ jobs:
           name: benchmark-results-${{ github.run_id }}
           path: |
             benchmark/benchmark_report.html
-            benchmark/*.png
             benchmark/*.json
             benchmark/benchmark_log.txt
           retention-days: 30

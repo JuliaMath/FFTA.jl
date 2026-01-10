@@ -1,7 +1,8 @@
 #!/usr/bin/env julia
 
 """
-Generate HTML report with embedded plots for FFTA vs FFTW benchmarks
+Generate HTML report with embedded Plotly.js charts for FFTA vs FFTW benchmarks
+Uses client-side JavaScript to render interactive plots from JSON data
 """
 
 # Ensure packages are installed
@@ -9,7 +10,7 @@ import Pkg
 Pkg.instantiate()
 
 using JSON
-using Base64
+using Dates
 
 function generate_html_report()
     # Load results
@@ -23,16 +24,9 @@ function generate_html_report()
     ffta_results = JSON.parsefile(ffta_file)
     fftw_results = JSON.parsefile(fftw_file)
 
-    # Find all plot images
-    plot_dir = @__DIR__
-    plot_files = [
-        ("performance_comparison_all.png", "Combined Performance: Runtime/N vs N"),
-        ("absolute_runtime_comparison.png", "Absolute Runtime Comparison"),
-        ("performance_odd_power_of_2.png", "Odd Powers of 2"),
-        ("performance_even_power_of_2.png", "Even Powers of 2"),
-        ("performance_power_of_3.png", "Powers of 3"),
-        ("performance_composite.png", "Composite Number (840)")
-    ]
+    # Embed JSON data in JavaScript
+    ffta_json = JSON.json(ffta_results)
+    fftw_json = JSON.json(fftw_results)
 
     # Start HTML document
     html = """
@@ -42,6 +36,7 @@ function generate_html_report()
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>FFTA.jl vs FFTW.jl Performance Benchmark</title>
+        <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
         <style>
             body {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -78,12 +73,10 @@ function generate_html_report()
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 margin: 20px 0;
-                text-align: center;
             }
-            .plot-container img {
-                max-width: 100%;
-                height: auto;
-                border-radius: 4px;
+            .plot {
+                width: 100%;
+                height: 600px;
             }
             .category-grid {
                 display: grid;
@@ -153,6 +146,7 @@ function generate_html_report()
                 <strong>Evaluations per sample:</strong> 10<br>
                 <strong>Data type:</strong> ComplexF64<br>
                 <strong>Total array sizes tested:</strong> $(length(ffta_results["data"]))<br>
+                <strong>Report generated:</strong> $(now())<br>
             </div>
 
             <h3>Array Size Categories</h3>
@@ -163,105 +157,41 @@ function generate_html_report()
                 <li><strong>Composite:</strong> 2×3×4×5×7 = 840</li>
             </ul>
         </div>
-    """
 
-    # Add plots
-    html *= "\n<h2>Performance Visualizations</h2>\n"
+        <h2>Performance Visualizations</h2>
 
-    for (filename, title) in plot_files
-        plot_path = joinpath(plot_dir, filename)
-        if isfile(plot_path)
-            # Read and encode image as base64
-            img_data = read(plot_path)
-            img_base64 = base64encode(img_data)
+        <div class="plot-container">
+            <h3>Runtime/N vs N (All Categories)</h3>
+            <div id="plot-combined" class="plot"></div>
+        </div>
 
-            html *= """
+        <div class="plot-container">
+            <h3>Absolute Runtime (All Categories)</h3>
+            <div id="plot-absolute" class="plot"></div>
+        </div>
+
+        <div class="category-grid">
             <div class="plot-container">
-                <h3>$title</h3>
-                <img src="data:image/png;base64,$img_base64" alt="$title">
+                <h3>Odd Powers of 2</h3>
+                <div id="plot-odd" class="plot" style="height: 400px;"></div>
             </div>
-            """
-        end
-    end
+            <div class="plot-container">
+                <h3>Even Powers of 2</h3>
+                <div id="plot-even" class="plot" style="height: 400px;"></div>
+            </div>
+            <div class="plot-container">
+                <h3>Powers of 3</h3>
+                <div id="plot-power3" class="plot" style="height: 400px;"></div>
+            </div>
+            <div class="plot-container">
+                <h3>Composite (840)</h3>
+                <div id="plot-composite" class="plot" style="height: 400px;"></div>
+            </div>
+        </div>
 
-    # Add detailed results table
-    html *= """
-    <h2>Detailed Results</h2>
-    """
+        <h2>Detailed Results</h2>
+        <div id="results-tables"></div>
 
-    # Category information
-    categories = ["odd_power_of_2", "even_power_of_2", "power_of_3", "composite"]
-    category_labels = Dict(
-        "odd_power_of_2" => "Odd Powers of 2",
-        "even_power_of_2" => "Even Powers of 2",
-        "power_of_3" => "Powers of 3",
-        "composite" => "Composite (840)"
-    )
-
-    ffta_data = ffta_results["data"]
-    fftw_data = fftw_results["data"]
-
-    for category in categories
-        ffta_cat = [d for d in ffta_data if get(d, "category", "") == category]
-        fftw_cat = [d for d in fftw_data if get(d, "category", "") == category]
-
-        if isempty(ffta_cat) && isempty(fftw_cat)
-            continue
-        end
-
-        html *= """
-        <h3>$(category_labels[category])</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Array Size (N)</th>
-                    <th>FFTA Time (μs)</th>
-                    <th>FFTW Time (μs)</th>
-                    <th>FFTA Runtime/N (ns)</th>
-                    <th>FFTW Runtime/N (ns)</th>
-                    <th>Speedup</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-
-        all_sizes = sort(unique(vcat([d["size"] for d in ffta_cat], [d["size"] for d in fftw_cat])))
-
-        for n in all_sizes
-            ffta_entry = findfirst(d -> d["size"] == n, ffta_cat)
-            fftw_entry = findfirst(d -> d["size"] == n, fftw_cat)
-
-            if !isnothing(ffta_entry) && !isnothing(fftw_entry)
-                ffta_time = ffta_cat[ffta_entry]["median_time"] * 1e6
-                fftw_time = fftw_cat[fftw_entry]["median_time"] * 1e6
-                ffta_per_n = ffta_cat[ffta_entry]["runtime_per_element"] * 1e9
-                fftw_per_n = fftw_cat[fftw_entry]["runtime_per_element"] * 1e9
-                speedup = fftw_time / ffta_time
-
-                speedup_class = speedup > 1 ? "faster" : "slower"
-                speedup_text = speedup > 1 ? "$(round(speedup, digits=2))x (FFTA faster)" : "$(round(1/speedup, digits=2))x (FFTW faster)"
-
-                html *= """
-                <tr>
-                    <td>$n</td>
-                    <td>$(round(ffta_time, digits=3))</td>
-                    <td>$(round(fftw_time, digits=3))</td>
-                    <td>$(round(ffta_per_n, digits=3))</td>
-                    <td>$(round(fftw_per_n, digits=3))</td>
-                    <td class="$speedup_class">$speedup_text</td>
-                </tr>
-                """
-            end
-        end
-
-        html *= """
-            </tbody>
-        </table>
-        """
-    end
-
-    # Close HTML
-    html *= """
         <div class="summary" style="margin-top: 40px;">
             <h2>Interpretation</h2>
             <p>
@@ -276,12 +206,230 @@ function generate_html_report()
                 <li>Powers of 3 may use different factorization strategies</li>
                 <li>Composite numbers test the FFT implementation's ability to handle general factorizations</li>
                 <li>FFTA.jl is a pure Julia implementation, while FFTW.jl wraps optimized C code</li>
+                <li>Interactive plots allow zooming and hovering for detailed inspection</li>
             </ul>
         </div>
 
+        <script>
+            // Embedded benchmark data
+            const fftaResults = $ffta_json;
+            const fftwResults = $fftw_json;
+
+            const categories = {
+                'odd_power_of_2': { name: 'Odd Powers of 2', color: 'blue' },
+                'even_power_of_2': { name: 'Even Powers of 2', color: 'red' },
+                'power_of_3': { name: 'Powers of 3', color: 'green' },
+                'composite': { name: 'Composite', color: 'purple' }
+            };
+
+            // Helper function to filter data by category
+            function filterByCategory(data, category) {
+                return data.filter(d => d.category === category);
+            }
+
+            // Create combined Runtime/N plot
+            function createCombinedPlot() {
+                const traces = [];
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                    if (fftaCat.length > 0) {
+                        traces.push({
+                            x: fftaCat.map(d => d.size),
+                            y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                            name: 'FFTA: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, color: catInfo.color },
+                            line: { width: 2, color: catInfo.color }
+                        });
+                    }
+
+                    if (fftwCat.length > 0) {
+                        traces.push({
+                            x: fftwCat.map(d => d.size),
+                            y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                            name: 'FFTW: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, symbol: 'square', color: catInfo.color },
+                            line: { width: 2, dash: 'dash', color: catInfo.color }
+                        });
+                    }
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true,
+                    legend: { x: 1.05, y: 1 }
+                };
+
+                Plotly.newPlot('plot-combined', traces, layout, { responsive: true });
+            }
+
+            // Create absolute runtime plot
+            function createAbsolutePlot() {
+                const traces = [];
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                    if (fftaCat.length > 0) {
+                        traces.push({
+                            x: fftaCat.map(d => d.size),
+                            y: fftaCat.map(d => d.median_time * 1e6),
+                            name: 'FFTA: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, color: catInfo.color },
+                            line: { width: 2, color: catInfo.color }
+                        });
+                    }
+
+                    if (fftwCat.length > 0) {
+                        traces.push({
+                            x: fftwCat.map(d => d.size),
+                            y: fftwCat.map(d => d.median_time * 1e6),
+                            name: 'FFTW: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, symbol: 'square', color: catInfo.color },
+                            line: { width: 2, dash: 'dash', color: catInfo.color }
+                        });
+                    }
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime (microseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true,
+                    legend: { x: 1.05, y: 1 }
+                };
+
+                Plotly.newPlot('plot-absolute', traces, layout, { responsive: true });
+            }
+
+            // Create category-specific plots
+            function createCategoryPlot(catKey, divId) {
+                const fftaCat = filterByCategory(fftaResults.data, catKey);
+                const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                if (fftaCat.length === 0 && fftwCat.length === 0) return;
+
+                const traces = [];
+                const catInfo = categories[catKey];
+
+                if (fftaCat.length > 0) {
+                    traces.push({
+                        x: fftaCat.map(d => d.size),
+                        y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTA.jl',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 10, color: catInfo.color },
+                        line: { width: 2, color: catInfo.color }
+                    });
+                }
+
+                if (fftwCat.length > 0) {
+                    traces.push({
+                        x: fftwCat.map(d => d.size),
+                        y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTW.jl',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 10, symbol: 'square', color: 'gray' },
+                        line: { width: 2, color: 'gray' }
+                    });
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true
+                };
+
+                Plotly.newPlot(divId, traces, layout, { responsive: true });
+            }
+
+            // Create detailed results tables
+            function createResultsTables() {
+                let html = '';
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                    if (fftaCat.length === 0 && fftwCat.length === 0) continue;
+
+                    html += '<h3>' + catInfo.name + '</h3>';
+                    html += '<table>';
+                    html += '<thead><tr>';
+                    html += '<th>Array Size (N)</th>';
+                    html += '<th>FFTA Time (μs)</th>';
+                    html += '<th>FFTW Time (μs)</th>';
+                    html += '<th>FFTA Runtime/N (ns)</th>';
+                    html += '<th>FFTW Runtime/N (ns)</th>';
+                    html += '<th>Speedup</th>';
+                    html += '</tr></thead>';
+                    html += '<tbody>';
+
+                    const allSizes = [...new Set([...fftaCat.map(d => d.size), ...fftwCat.map(d => d.size)])].sort((a, b) => a - b);
+
+                    for (const size of allSizes) {
+                        const fftaData = fftaCat.find(d => d.size === size);
+                        const fftwData = fftwCat.find(d => d.size === size);
+
+                        if (fftaData && fftwData) {
+                            const fftaTime = (fftaData.median_time * 1e6).toFixed(3);
+                            const fftwTime = (fftwData.median_time * 1e6).toFixed(3);
+                            const fftaPerN = (fftaData.runtime_per_element * 1e9).toFixed(3);
+                            const fftwPerN = (fftwData.runtime_per_element * 1e9).toFixed(3);
+                            const speedup = fftwData.median_time / fftaData.median_time;
+                            const speedupClass = speedup > 1 ? 'faster' : 'slower';
+                            const speedupText = speedup > 1
+                                ? speedup.toFixed(2) + 'x (FFTA faster)'
+                                : (1/speedup).toFixed(2) + 'x (FFTW faster)';
+
+                            html += '<tr>';
+                            html += '<td>' + size + '</td>';
+                            html += '<td>' + fftaTime + '</td>';
+                            html += '<td>' + fftwTime + '</td>';
+                            html += '<td>' + fftaPerN + '</td>';
+                            html += '<td>' + fftwPerN + '</td>';
+                            html += '<td class="' + speedupClass + '">' + speedupText + '</td>';
+                            html += '</tr>';
+                        }
+                    }
+
+                    html += '</tbody></table>';
+                }
+
+                document.getElementById('results-tables').innerHTML = html;
+            }
+
+            // Initialize all plots on page load
+            window.addEventListener('load', function() {
+                createCombinedPlot();
+                createAbsolutePlot();
+                createCategoryPlot('odd_power_of_2', 'plot-odd');
+                createCategoryPlot('even_power_of_2', 'plot-even');
+                createCategoryPlot('power_of_3', 'plot-power3');
+                createCategoryPlot('composite', 'plot-composite');
+                createResultsTables();
+            });
+        </script>
+
         <footer style="margin-top: 40px; padding: 20px; text-align: center; color: #7f8c8d; border-top: 1px solid #ddd;">
-            <p>Generated on $(now())</p>
             <p>FFTA.jl Performance Benchmark Suite</p>
+            <p>Interactive plots powered by Plotly.js</p>
         </footer>
     </body>
     </html>
@@ -290,11 +438,11 @@ function generate_html_report()
     # Write HTML file
     output_file = joinpath(@__DIR__, "benchmark_report.html")
     write(output_file, html)
-    println("HTML report saved to: $output_file")
+    println("HTML report saved to: ", output_file)
+    println("Open in a web browser to view interactive Plotly.js charts")
 
     return output_file
 end
 
 # Generate report
-using Dates
 generate_html_report()
