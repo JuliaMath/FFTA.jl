@@ -47,7 +47,7 @@ println("Step 3/3: Generating HTML report with interactive plots...")
 println("-" ^ 70)
 html_script = joinpath(benchmark_dir, "generate_html_report.jl")
 
-html_cmd = `julia --project=$plot_project $html_script`
+html_cmd = `julia --project=$benchmark_dir $html_script`
 
 result = run(html_cmd)
 if !success(result)
