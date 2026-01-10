@@ -13,12 +13,17 @@ using FFTW
 using BenchmarkTools
 using JSON
 
-# Load shared benchmark definitions
-include(joinpath(@__DIR__, "..", "common_defs.jl"))
-
-# Use shared definitions
-const SIZE_CATEGORIES = create_size_categories()
-const ALL_SIZES = sort(get_all_sizes())
+# Load shared benchmark definitions from parent project
+# (common_defs.jl uses Primes which is in the parent benchmark project)
+const SIZE_CATEGORIES, ALL_SIZES = let
+    parent_project = joinpath(@__DIR__, "..")
+    Pkg.activate(parent_project)
+    Pkg.instantiate()
+    include(joinpath(parent_project, "common_defs.jl"))
+    # Restore this project
+    Pkg.activate(@__DIR__)
+    (create_size_categories(), sort(get_all_sizes()))
+end
 
 # Number of samples for each benchmark
 const SAMPLES = 100
