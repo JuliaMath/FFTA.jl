@@ -57,7 +57,7 @@ function benchmark_ffta()
 
         # Benchmark complex FFT
         x = randn(ComplexF64, n)
-        trial = @benchmark fft($x) samples=$SAMPLES evals=$EVALS
+        trial = @benchmark fft($x) samples=SAMPLES evals=EVALS
 
         median_time = median(trial).time * 1e-9  # Convert to seconds
         runtime_per_element = median_time / n
