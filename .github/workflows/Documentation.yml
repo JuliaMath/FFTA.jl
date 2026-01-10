@@ -6,19 +6,44 @@ on:
       - main
     tags: '*'
   pull_request:
+  workflow_run:
+    workflows: ["Benchmarks"]
+    types:
+      - completed
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Download benchmark results (from workflow_run)
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: benchmarks.yml
+          name: benchmark-results-${{ github.event.workflow_run.id }}
+          path: docs/src/benchmarks/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Check for benchmark results
+        run: |
+          if [ -f "docs/src/benchmarks/benchmark_report.html" ]; then
+            echo "✅ Benchmark report found"
+          else
+            echo "⚠️ No benchmark report found - docs will show placeholder"
+          fi
+
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1.9'
+
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+
       - name: Build and deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl
