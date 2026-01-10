@@ -69,7 +69,7 @@ The benchmark suite generates:
    - Client-side Plotly.js charts (no external files needed)
    - Combined Runtime/N vs N plot for all categories
    - Absolute runtime plot for all categories
-   - Individual plots for each category (odd/even powers of 2, powers of 3, cumulative products, primes)
+   - Individual plots for each category (odd/even powers of 2, powers of 3, composite, primes)
    - Detailed results tables with speedup comparisons
 
 ## Metrics
@@ -99,7 +99,7 @@ The benchmarks test various array sizes categorized by their mathematical struct
    - Sizes: 3, 9, 27, 81, 243, 729, 2187, 6561, 19683
    - Tests radix-3 FFT algorithms
 
-4. **Cumulative Products**: 3, 12, 60, 300, 2100, 23100
+4. **Composite**: 3, 12, 60, 300, 2100, 23100
    - Cumulative products of 3, 4, 5, 5, 7, 11
    - Tests mixed-radix FFT factorization with increasing complexity
 

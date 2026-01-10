@@ -60,9 +60,9 @@ function create_size_categories()
         categories[n] = "power_of_3"
     end
 
-    # Categorize cumulative products
+    # Categorize composite numbers
     for n in CUMULATIVE_PRODUCTS
-        categories[n] = "cumulative_product"
+        categories[n] = "composite"
     end
 
     # Categorize primes

@@ -121,79 +121,6 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Comment benchmark results on PR
-        if: github.event_name == 'pull_request' && success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-
-            try {
-              // Read benchmark results
-              const fftaResults = JSON.parse(fs.readFileSync('benchmark/results_ffta.json', 'utf8'));
-              const fftwResults = JSON.parse(fs.readFileSync('benchmark/results_fftw.json', 'utf8'));
-
-              // Create summary table
-              let comment = '## 📊 Benchmark Results\n\n';
-              comment += 'Performance comparison between FFTA.jl and FFTW.jl:\n\n';
-              comment += '| Category | Array Size | FFTA (μs) | FFTW (μs) | Speedup |\n';
-              comment += '|----------|------------|-----------|-----------|----------|\n';
-
-              const categories = {
-                'odd_power_of_2': 'Odd Powers of 2',
-                'even_power_of_2': 'Even Powers of 2',
-                'power_of_3': 'Powers of 3',
-                'cumulative_product': 'Cumulative Products',
-                'prime': 'Prime Numbers'
-              };
-
-              // Sample sizes from each category
-              const sampleSizes = {
-                'odd_power_of_2': [8, 128, 2048, 32768],
-                'even_power_of_2': [16, 256, 4096],
-                'power_of_3': [9, 243, 6561],
-                'cumulative_product': [12, 60, 300, 2100],
-                'prime': [127, 1009, 7919, 19997]
-              };
-
-              for (const [catKey, catName] of Object.entries(categories)) {
-                const sizes = sampleSizes[catKey] || [];
-                for (const size of sizes) {
-                  const fftaData = fftaResults.data.find(d => d.size === size && d.category === catKey);
-                  const fftwData = fftwResults.data.find(d => d.size === size && d.category === catKey);
-
-                  if (fftaData && fftwData) {
-                    const fftaTime = (fftaData.median_time * 1e6).toFixed(3);
-                    const fftwTime = (fftwData.median_time * 1e6).toFixed(3);
-                    const speedup = fftwData.median_time / fftaData.median_time;
-                    const speedupText = speedup > 1
-                      ? `${speedup.toFixed(2)}x (FFTA faster)`
-                      : `${(1/speedup).toFixed(2)}x (FFTW faster)`;
-
-                    comment += `| ${catName} | ${size} | ${fftaTime} | ${fftwTime} | ${speedupText} |\n`;
-                  }
-                }
-              }
-
-              comment += '\n📈 **[Download detailed HTML report and plots from artifacts]';
-              comment += '(${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**\n';
-              comment += '\n---\n';
-              comment += '*Benchmarks run with BenchmarkTools.jl (100 samples, 10 evaluations per sample)*';
-
-              // Post comment
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-
-              console.log('✅ Posted benchmark results to PR');
-            } catch (error) {
-              console.error('❌ Failed to post PR comment:', error);
-              // Don't fail the workflow if commenting fails
-            }
-
       - name: Generate job summary
         if: success()
         run: |
@@ -205,7 +132,7 @@ jobs:
           # Count total tests
           FFTA_COUNT=$(grep -o '"size"' benchmark/results_ffta.json | wc -l)
           echo "- Tested $FFTA_COUNT array sizes across 5 categories" >> $GITHUB_STEP_SUMMARY
-          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Cumulative products, Prime numbers" >> $GITHUB_STEP_SUMMARY
+          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Composite, Prime numbers" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "📈 **Outputs generated:**" >> $GITHUB_STEP_SUMMARY
