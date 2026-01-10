@@ -82,16 +82,14 @@ jobs:
 
       - name: Run benchmarks
         id: run_benchmarks
-        continue-on-error: true
         run: |
           cd benchmark
+          set -o pipefail
           julia --project=. run_benchmarks.jl 2>&1 | tee benchmark_log.txt
-          exit_code=${PIPESTATUS[0]}
-          echo "benchmark_exit_code=$exit_code" >> $GITHUB_OUTPUT
-          exit $exit_code
 
       - name: Check benchmark results
         id: check_results
+        if: success()
         run: |
           if [ -f "benchmark/results_ffta.json" ] && [ -f "benchmark/results_fftw.json" ]; then
             echo "results_exist=true" >> $GITHUB_OUTPUT
@@ -99,6 +97,7 @@ jobs:
           else
             echo "results_exist=false" >> $GITHUB_OUTPUT
             echo "❌ Benchmark results not found"
+            exit 1
           fi
 
           if [ -f "benchmark/benchmark_report.html" ]; then
@@ -107,6 +106,7 @@ jobs:
           else
             echo "html_exists=false" >> $GITHUB_OUTPUT
             echo "⚠️ HTML report not found"
+            exit 1
           fi
 
       - name: Upload benchmark results
@@ -123,7 +123,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Comment benchmark results on PR
-        if: github.event_name == 'pull_request' && steps.check_results.outputs.results_exist == 'true'
+        if: github.event_name == 'pull_request' && success()
         uses: actions/github-script@v7
         with:
           script: |
@@ -194,47 +194,23 @@ jobs:
             }
 
       - name: Generate job summary
-        if: always()
+        if: success()
         run: |
           echo "## 📊 Benchmark Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Benchmarks completed successfully!**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "benchmark/results_ffta.json" ] && [ -f "benchmark/results_fftw.json" ]; then
-            echo "✅ **Benchmarks completed successfully!**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+          # Count total tests
+          FFTA_COUNT=$(grep -o '"size"' benchmark/results_ffta.json | wc -l)
+          echo "- Tested $FFTA_COUNT array sizes across 4 categories" >> $GITHUB_STEP_SUMMARY
+          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Composite" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-            # Count total tests
-            FFTA_COUNT=$(grep -o '"size"' benchmark/results_ffta.json | wc -l)
-            echo "- Tested $FFTA_COUNT array sizes across 4 categories" >> $GITHUB_STEP_SUMMARY
-            echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Composite" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            if [ -f "benchmark/benchmark_report.html" ]; then
-              echo "📈 **Outputs generated:**" >> $GITHUB_STEP_SUMMARY
-              echo "- Interactive HTML report with embedded plots" >> $GITHUB_STEP_SUMMARY
-              echo "- Category-specific performance plots" >> $GITHUB_STEP_SUMMARY
-              echo "- Combined performance comparison plots" >> $GITHUB_STEP_SUMMARY
-              echo "- Raw JSON results for further analysis" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "❌ **Benchmarks failed or incomplete**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the build logs and artifacts for details." >> $GITHUB_STEP_SUMMARY
-          fi
-
+          echo "📈 **Outputs generated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Interactive HTML report with embedded plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Category-specific performance plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Combined performance comparison plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Raw JSON results for further analysis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📦 **Artifacts:** Download benchmark results from the artifacts section above" >> $GITHUB_STEP_SUMMARY
-
-      - name: Check benchmark status
-        if: always()
-        run: |
-          exit_code="${{ steps.run_benchmarks.outputs.benchmark_exit_code }}"
-          if [ -z "$exit_code" ]; then
-            echo "⚠️ No exit code captured, assuming failure"
-            exit 1
-          elif [ "$exit_code" != "0" ]; then
-            echo "❌ Benchmarks failed with exit code $exit_code"
-            exit 1
-          else
-            echo "✅ Benchmarks completed successfully"
-          fi
