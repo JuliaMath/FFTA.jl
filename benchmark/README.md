@@ -7,9 +7,8 @@ This directory contains a comprehensive benchmark suite to compare the performan
 ```
 benchmark/
 ├── run_benchmarks.jl          # Main script to run all benchmarks
-├── plot_results.jl            # Script to generate comparison plots
-├── generate_html_report.jl    # Script to generate HTML report
-├── Project.toml               # Dependencies for plotting
+├── generate_html_report.jl    # Script to generate HTML report with Plotly.js
+├── Project.toml               # Dependencies (JSON, Dates)
 ├── ffta_env/                  # Isolated environment for FFTA
 │   ├── bench_ffta.jl         # FFTA benchmark script
 │   └── Project.toml          # FFTA dependencies
@@ -37,8 +36,7 @@ julia run_benchmarks.jl
 This will:
 1. Run FFTA benchmarks in an isolated environment
 2. Run FFTW benchmarks in an isolated environment
-3. Generate comparison plots (combined and per-category)
-4. Generate an interactive HTML report with embedded plots
+3. Generate an interactive HTML report with embedded Plotly.js charts
 
 ### Individual Benchmarks
 
@@ -54,13 +52,7 @@ cd benchmark/fftw_env
 julia --project=. bench_fftw.jl
 ```
 
-Generate plots from existing results:
-```bash
-cd benchmark
-julia --project=. plot_results.jl
-```
-
-Generate HTML report from existing results:
+Generate HTML report from existing JSON results:
 ```bash
 cd benchmark
 julia --project=. generate_html_report.jl
@@ -72,10 +64,13 @@ The benchmark suite generates:
 
 1. **results_ffta.json**: Raw benchmark data for FFTA.jl
 2. **results_fftw.json**: Raw benchmark data for FFTW.jl
-3. **benchmark_report.html**: Interactive HTML report with all plots and detailed tables
-4. **performance_comparison_all.png**: Combined plot of Runtime/N vs N for all categories
-5. **absolute_runtime_comparison.png**: Plot of absolute runtime vs N for all categories
-6. **performance_*.png**: Individual plots for each category (odd powers of 2, even powers of 2, powers of 3, composite)
+3. **benchmark_report.html**: Self-contained interactive HTML report with:
+   - Embedded JSON data
+   - Client-side Plotly.js charts (no external files needed)
+   - Combined Runtime/N vs N plot for all categories
+   - Absolute runtime plot for all categories
+   - Individual plots for each category (odd/even powers of 2, powers of 3, composite)
+   - Detailed results tables with speedup comparisons
 
 ## Metrics
 
@@ -133,9 +128,11 @@ The benchmark suite requires:
 - FFTW.jl (for comparison)
 - BenchmarkTools.jl (for accurate timing)
 - JSON.jl (for storing results)
-- Plots.jl (for visualization)
+- Dates.jl (standard library, for timestamps)
 
 All dependencies are automatically installed when running the benchmarks.
+
+**Note:** Plots are generated client-side using Plotly.js (loaded from CDN in the HTML). No Julia plotting packages are required.
 
 ## Continuous Integration
 
@@ -147,9 +144,9 @@ The benchmark suite integrates with GitHub Actions via the `.github/workflows/be
   - Manual workflow dispatch
 
 - **Artifacts**: Each CI run uploads:
-  - HTML report (`benchmark_report.html`)
-  - All plots (`.png` files)
-  - Raw results (`.json` files)
+  - Interactive HTML report (`benchmark_report.html`) with embedded Plotly.js charts
+  - Raw benchmark results (`.json` files)
+  - Benchmark logs for debugging
   - Artifacts are retained for 30 days
 
 - **PR Comments**: For pull requests, the workflow automatically posts a summary table with key results
