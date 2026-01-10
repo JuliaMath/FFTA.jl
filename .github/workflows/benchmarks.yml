@@ -152,7 +152,7 @@ jobs:
                 'odd_power_of_2': [8, 128, 2048, 32768],
                 'even_power_of_2': [16, 256, 4096],
                 'power_of_3': [9, 243, 6561],
-                'cumulative_product': [6, 120, 840, 9240],
+                'cumulative_product': [12, 60, 300, 2100],
                 'prime': [127, 1009, 7919, 19997]
               };
 

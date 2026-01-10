@@ -99,8 +99,8 @@ The benchmarks test various array sizes categorized by their mathematical struct
    - Sizes: 3, 9, 27, 81, 243, 729, 2187, 6561, 19683
    - Tests radix-3 FFT algorithms
 
-4. **Cumulative Products**: 2, 6, 24, 120, 840, 9240, 120120
-   - Cumulative products of 2, 3, 4, 5, 7, 11, 13
+4. **Cumulative Products**: 3, 12, 60, 300, 2100, 23100
+   - Cumulative products of 3, 4, 5, 5, 7, 11
    - Tests mixed-radix FFT factorization with increasing complexity
 
 5. **Prime Numbers**: All 2267 primes below 20,000

@@ -155,7 +155,7 @@ function generate_html_report()
                 <li><strong>Odd Powers of 2:</strong> 2¹, 2³, 2⁵, 2⁷, 2⁹, 2¹¹, 2¹³, 2¹⁵ (2, 8, 32, 128, 512, 2048, 8192, 32768)</li>
                 <li><strong>Even Powers of 2:</strong> 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)</li>
                 <li><strong>Powers of 3:</strong> 3¹, 3², 3³, 3⁴, 3⁵, 3⁶, 3⁷, 3⁸, 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)</li>
-                <li><strong>Cumulative Products:</strong> 2, 6, 24, 120, 840, 9240, 120120 (cumulative products of 2,3,4,5,7,11,13)</li>
+                <li><strong>Cumulative Products:</strong> 3, 12, 60, 300, 2100, 23100 (cumulative products of 3,4,5,5,7,11)</li>
                 <li><strong>Primes:</strong> All $(length(primes(20000))) prime numbers below 20,000</li>
             </ul>
         </div>

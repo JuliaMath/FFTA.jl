@@ -14,47 +14,13 @@ Pkg.instantiate()
 using FFTA
 using BenchmarkTools
 using JSON
-using Primes
 
-# Array sizes categorized by structure
-const ODD_POWERS_OF_2 = [2^p for p in 1:2:15]  # 2, 8, 32, 128, 512, 2048, 8192, 32768
-const EVEN_POWERS_OF_2 = [2^p for p in 2:2:14]  # 4, 16, 64, 256, 1024, 4096, 16384
-const POWERS_OF_3 = [3^p for p in 1:9]  # 3, 9, 27, 81, 243, 729, 2187, 6561, 19683
+# Load shared benchmark definitions
+include(joinpath(@__DIR__, "..", "common_defs.jl"))
 
-# Cumulative products of 2,3,4,5,7,11,13
-const CUMULATIVE_PRODUCTS = begin
-    factors = [2, 3, 4, 5, 7, 11, 13]
-    result = Int[]
-    product = 1
-    for factor in factors
-        product *= factor
-        push!(result, product)
-    end
-    result  # [2, 6, 24, 120, 840, 9240, 120120]
-end
-
-# All primes below 20000
-const PRIMES_BELOW_20000 = primes(20000)
-
-# Combine all sizes and categorize them
-const SIZE_CATEGORIES = Dict{Int, String}()
-for n in ODD_POWERS_OF_2
-    SIZE_CATEGORIES[n] = "odd_power_of_2"
-end
-for n in EVEN_POWERS_OF_2
-    SIZE_CATEGORIES[n] = "even_power_of_2"
-end
-for n in POWERS_OF_3
-    SIZE_CATEGORIES[n] = "power_of_3"
-end
-for n in CUMULATIVE_PRODUCTS
-    SIZE_CATEGORIES[n] = "cumulative_product"
-end
-for n in PRIMES_BELOW_20000
-    SIZE_CATEGORIES[n] = "prime"
-end
-
-const ALL_SIZES = sort(collect(keys(SIZE_CATEGORIES)))
+# Use shared definitions
+const SIZE_CATEGORIES = create_size_categories()
+const ALL_SIZES = sort(get_all_sizes())
 
 # Number of samples for each benchmark
 const SAMPLES = 100
