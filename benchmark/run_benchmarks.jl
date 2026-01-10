@@ -24,7 +24,7 @@ ffta_cmd = `julia --project=$ffta_project $ffta_script`
 
 result = run(ffta_cmd)
 if !success(result)
-    error("FFTA benchmark failed with exit code $(result.exitcode)")
+    error("FFTA benchmark failed with exit code ", result.exitcode)
 end
 println()
 
@@ -38,7 +38,7 @@ fftw_cmd = `julia --project=$fftw_project $fftw_script`
 
 result = run(fftw_cmd)
 if !success(result)
-    error("FFTW benchmark failed with exit code $(result.exitcode)")
+    error("FFTW benchmark failed with exit code ", result.exitcode)
 end
 println()
 
@@ -52,7 +52,7 @@ plot_cmd = `julia --project=$plot_project $plot_script`
 
 result = run(plot_cmd)
 if !success(result)
-    error("Plotting failed with exit code $(result.exitcode)")
+    error("Plotting failed with exit code ", result.exitcode)
 end
 println()
 
@@ -65,7 +65,7 @@ html_cmd = `julia --project=$plot_project $html_script`
 
 result = run(html_cmd)
 if !success(result)
-    error("HTML generation failed with exit code $(result.exitcode)")
+    error("HTML generation failed with exit code ", result.exitcode)
 end
 println()
 
@@ -74,10 +74,10 @@ println("Benchmark suite completed successfully!")
 println("=" ^ 70)
 println()
 println("Results:")
-println("  - FFTA results: $(joinpath(benchmark_dir, \"results_ffta.json\"))")
-println("  - FFTW results: $(joinpath(benchmark_dir, \"results_fftw.json\"))")
-println("  - HTML report: $(joinpath(benchmark_dir, \"benchmark_report.html\"))")
-println("  - Combined plot: $(joinpath(benchmark_dir, \"performance_comparison_all.png\"))")
-println("  - Absolute runtime plot: $(joinpath(benchmark_dir, \"absolute_runtime_comparison.png\"))")
+println("  - FFTA results: ", joinpath(benchmark_dir, "results_ffta.json"))
+println("  - FFTW results: ", joinpath(benchmark_dir, "results_fftw.json"))
+println("  - HTML report: ", joinpath(benchmark_dir, "benchmark_report.html"))
+println("  - Combined plot: ", joinpath(benchmark_dir, "performance_comparison_all.png"))
+println("  - Absolute runtime plot: ", joinpath(benchmark_dir, "absolute_runtime_comparison.png"))
 println("  - Category plots: performance_*.png")
 println()
