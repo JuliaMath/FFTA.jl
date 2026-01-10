@@ -143,7 +143,8 @@ jobs:
                 'odd_power_of_2': 'Odd Powers of 2',
                 'even_power_of_2': 'Even Powers of 2',
                 'power_of_3': 'Powers of 3',
-                'composite': 'Composite'
+                'cumulative_product': 'Cumulative Products',
+                'prime': 'Prime Numbers'
               };
 
               // Sample sizes from each category
@@ -151,7 +152,8 @@ jobs:
                 'odd_power_of_2': [8, 128, 2048, 32768],
                 'even_power_of_2': [16, 256, 4096],
                 'power_of_3': [9, 243, 6561],
-                'composite': [840]
+                'cumulative_product': [6, 120, 840, 9240],
+                'prime': [127, 1009, 7919, 19997]
               };
 
               for (const [catKey, catName] of Object.entries(categories)) {
@@ -202,8 +204,8 @@ jobs:
 
           # Count total tests
           FFTA_COUNT=$(grep -o '"size"' benchmark/results_ffta.json | wc -l)
-          echo "- Tested $FFTA_COUNT array sizes across 4 categories" >> $GITHUB_STEP_SUMMARY
-          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Composite" >> $GITHUB_STEP_SUMMARY
+          echo "- Tested $FFTA_COUNT array sizes across 5 categories" >> $GITHUB_STEP_SUMMARY
+          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Cumulative products, Prime numbers" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "📈 **Outputs generated:**" >> $GITHUB_STEP_SUMMARY

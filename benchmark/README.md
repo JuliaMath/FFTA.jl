@@ -69,7 +69,7 @@ The benchmark suite generates:
    - Client-side Plotly.js charts (no external files needed)
    - Combined Runtime/N vs N plot for all categories
    - Absolute runtime plot for all categories
-   - Individual plots for each category (odd/even powers of 2, powers of 3, composite)
+   - Individual plots for each category (odd/even powers of 2, powers of 3, cumulative products, primes)
    - Detailed results tables with speedup comparisons
 
 ## Metrics
@@ -99,8 +99,13 @@ The benchmarks test various array sizes categorized by their mathematical struct
    - Sizes: 3, 9, 27, 81, 243, 729, 2187, 6561, 19683
    - Tests radix-3 FFT algorithms
 
-4. **Composite Number**: 2×3×4×5×7 = 840
-   - Tests mixed-radix FFT factorization
+4. **Cumulative Products**: 2, 6, 24, 120, 840, 9240, 120120
+   - Cumulative products of 2, 3, 4, 5, 7, 11, 13
+   - Tests mixed-radix FFT factorization with increasing complexity
+
+5. **Prime Numbers**: All 2267 primes below 20,000
+   - Tests FFT performance on prime-sized arrays
+   - Prime sizes require specialized FFT algorithms (e.g., Bluestein's algorithm)
 
 All tests use complex double-precision arrays (`ComplexF64`)
 
@@ -128,6 +133,7 @@ The benchmark suite requires:
 - FFTW.jl (for comparison)
 - BenchmarkTools.jl (for accurate timing)
 - JSON.jl (for storing results)
+- Primes.jl (for generating prime-sized arrays)
 - Dates.jl (standard library, for timestamps)
 
 All dependencies are automatically installed when running the benchmarks.

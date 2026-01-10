@@ -11,6 +11,7 @@ Pkg.instantiate()
 
 using JSON
 using Dates
+using Primes
 
 function generate_html_report()
     # Load results
@@ -154,7 +155,8 @@ function generate_html_report()
                 <li><strong>Odd Powers of 2:</strong> 2¹, 2³, 2⁵, 2⁷, 2⁹, 2¹¹, 2¹³, 2¹⁵ (2, 8, 32, 128, 512, 2048, 8192, 32768)</li>
                 <li><strong>Even Powers of 2:</strong> 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)</li>
                 <li><strong>Powers of 3:</strong> 3¹, 3², 3³, 3⁴, 3⁵, 3⁶, 3⁷, 3⁸, 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)</li>
-                <li><strong>Composite:</strong> 2×3×4×5×7 = 840</li>
+                <li><strong>Cumulative Products:</strong> 2, 6, 24, 120, 840, 9240, 120120 (cumulative products of 2,3,4,5,7,11,13)</li>
+                <li><strong>Primes:</strong> All $(length(primes(20000))) prime numbers below 20,000</li>
             </ul>
         </div>
 
@@ -184,8 +186,12 @@ function generate_html_report()
                 <div id="plot-power3" class="plot" style="height: 400px;"></div>
             </div>
             <div class="plot-container">
-                <h3>Composite (840)</h3>
-                <div id="plot-composite" class="plot" style="height: 400px;"></div>
+                <h3>Cumulative Products</h3>
+                <div id="plot-cumulative" class="plot" style="height: 400px;"></div>
+            </div>
+            <div class="plot-container">
+                <h3>Prime Numbers</h3>
+                <div id="plot-primes" class="plot" style="height: 400px;"></div>
             </div>
         </div>
 
@@ -219,7 +225,8 @@ function generate_html_report()
                 'odd_power_of_2': { name: 'Odd Powers of 2', color: 'blue' },
                 'even_power_of_2': { name: 'Even Powers of 2', color: 'red' },
                 'power_of_3': { name: 'Powers of 3', color: 'green' },
-                'composite': { name: 'Composite', color: 'purple' }
+                'cumulative_product': { name: 'Cumulative Products', color: 'purple' },
+                'prime': { name: 'Prime Numbers', color: 'orange' }
             };
 
             // Helper function to filter data by category
@@ -422,7 +429,8 @@ function generate_html_report()
                 createCategoryPlot('odd_power_of_2', 'plot-odd');
                 createCategoryPlot('even_power_of_2', 'plot-even');
                 createCategoryPlot('power_of_3', 'plot-power3');
-                createCategoryPlot('composite', 'plot-composite');
+                createCategoryPlot('cumulative_product', 'plot-cumulative');
+                createCategoryPlot('prime', 'plot-primes');
                 createResultsTables();
             });
         </script>
