@@ -103,9 +103,10 @@ The benchmarks test various array sizes categorized by their mathematical struct
    - Cumulative products of 3, 4, 5, 5, 7, 11
    - Tests mixed-radix FFT factorization with increasing complexity
 
-5. **Prime Numbers**: All 2267 primes below 20,000
-   - Tests FFT performance on prime-sized arrays
+5. **Prime Numbers**: 20 logarithmically-spaced primes up to 20,000
+   - Tests FFT performance on prime-sized arrays with logarithmic spacing
    - Prime sizes require specialized FFT algorithms (e.g., Bluestein's algorithm)
+   - Logarithmic spacing ensures coverage from small to large primes
 
 All tests use complex double-precision arrays (`ComplexF64`)
 

@@ -75,7 +75,7 @@ Benchmarks are organized into categories based on array size structure:
 - **Even Powers of 2**: 2², 2⁴, 2⁶, ..., 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)
 - **Powers of 3**: 3¹, 3², 3³, ..., 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)
 - **Cumulative Products**: 3, 12, 60, 300, 2100, 23100 (cumulative products of 3, 4, 5, 5, 7, 11)
-- **Prime Numbers**: All 2267 prime numbers below 20,000
+- **Prime Numbers**: 20 logarithmically-spaced primes up to 20,000
 
 ### Metrics
 

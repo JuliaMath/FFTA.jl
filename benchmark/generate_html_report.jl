@@ -156,7 +156,7 @@ function generate_html_report()
                 <li><strong>Even Powers of 2:</strong> 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)</li>
                 <li><strong>Powers of 3:</strong> 3¹, 3², 3³, 3⁴, 3⁵, 3⁶, 3⁷, 3⁸, 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)</li>
                 <li><strong>Cumulative Products:</strong> 3, 12, 60, 300, 2100, 23100 (cumulative products of 3,4,5,5,7,11)</li>
-                <li><strong>Primes:</strong> All $(length(primes(20000))) prime numbers below 20,000</li>
+                <li><strong>Primes:</strong> 20 logarithmically-spaced prime numbers up to 20,000</li>
             </ul>
         </div>
 

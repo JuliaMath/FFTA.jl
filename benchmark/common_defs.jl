@@ -7,8 +7,26 @@ using Primes
 # Cumulative products of 3,4,5,5,7,11
 const CUMULATIVE_PRODUCTS = cumprod([3, 4, 5, 5, 7, 11])
 
-# All primes below 20000
-const PRIMES_BELOW_20000 = primes(20000)
+# Select 20 primes with logarithmic spacing
+const SELECTED_PRIMES = begin
+    # Generate logarithmically spaced target points
+    all_primes = primes(20000)
+    log_points = exp.(range(log(2), log(20000), length=20))
+
+    # Find nearest prime to each logarithmic point
+    selected = Int[]
+    for target in log_points
+        # Find the prime closest to this target
+        idx = argmin(abs.(all_primes .- target))
+        candidate = all_primes[idx]
+        # Avoid duplicates
+        if !(candidate in selected)
+            push!(selected, candidate)
+        end
+    end
+
+    sort!(selected)
+end
 
 # Odd powers of 2
 const ODD_POWERS_OF_2 = [2^i for i in 1:2:15]
@@ -48,7 +66,7 @@ function create_size_categories()
     end
 
     # Categorize primes
-    for n in PRIMES_BELOW_20000
+    for n in SELECTED_PRIMES
         categories[n] = "prime"
     end
 
@@ -62,5 +80,5 @@ Get all benchmark sizes in a flat array.
 """
 function get_all_sizes()
     return vcat(ODD_POWERS_OF_2, EVEN_POWERS_OF_2, POWERS_OF_3,
-                CUMULATIVE_PRODUCTS, PRIMES_BELOW_20000)
+                CUMULATIVE_PRODUCTS, SELECTED_PRIMES)
 end
