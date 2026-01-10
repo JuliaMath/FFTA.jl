@@ -156,8 +156,6 @@ The benchmark suite integrates with GitHub Actions via the `.github/workflows/be
   - Benchmark logs for debugging
   - Artifacts are retained for 30 days
 
-- **PR Comments**: For pull requests, the workflow automatically posts a summary table with key results
-
 To view benchmark results from a CI run:
 1. Go to the Actions tab in the repository
 2. Click on a "Benchmarks" workflow run
