@@ -5,6 +5,10 @@ Benchmark script for FFTW.jl
 This script runs in an isolated environment with only FFTW.jl loaded.
 """
 
+# Ensure packages are installed
+import Pkg
+Pkg.instantiate()
+
 using FFTW
 using BenchmarkTools
 using JSON

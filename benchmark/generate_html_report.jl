@@ -4,6 +4,10 @@
 Generate HTML report with embedded plots for FFTA vs FFTW benchmarks
 """
 
+# Ensure packages are installed
+import Pkg
+Pkg.instantiate()
+
 using JSON
 using Base64
 

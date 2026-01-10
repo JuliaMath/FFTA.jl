@@ -20,13 +20,12 @@ println("-" ^ 70)
 ffta_script = joinpath(benchmark_dir, "ffta_env", "bench_ffta.jl")
 ffta_project = joinpath(benchmark_dir, "ffta_env")
 
-ffta_cmd = `julia --project=$ffta_project -e "
-    import Pkg
-    Pkg.instantiate()
-    include(\"$ffta_script\")
-"`
+ffta_cmd = `julia --project=$ffta_project $ffta_script`
 
-success(run(ffta_cmd)) || error("FFTA benchmark failed!")
+result = run(ffta_cmd)
+if !success(result)
+    error("FFTA benchmark failed with exit code $(result.exitcode)")
+end
 println()
 
 # Run FFTW benchmark in separate process
@@ -35,13 +34,12 @@ println("-" ^ 70)
 fftw_script = joinpath(benchmark_dir, "fftw_env", "bench_fftw.jl")
 fftw_project = joinpath(benchmark_dir, "fftw_env")
 
-fftw_cmd = `julia --project=$fftw_project -e "
-    import Pkg
-    Pkg.instantiate()
-    include(\"$fftw_script\")
-"`
+fftw_cmd = `julia --project=$fftw_project $fftw_script`
 
-success(run(fftw_cmd)) || error("FFTW benchmark failed!")
+result = run(fftw_cmd)
+if !success(result)
+    error("FFTW benchmark failed with exit code $(result.exitcode)")
+end
 println()
 
 # Generate plots
@@ -50,13 +48,12 @@ println("-" ^ 70)
 plot_script = joinpath(benchmark_dir, "plot_results.jl")
 plot_project = benchmark_dir
 
-plot_cmd = `julia --project=$plot_project -e "
-    import Pkg
-    Pkg.instantiate()
-    include(\"$plot_script\")
-"`
+plot_cmd = `julia --project=$plot_project $plot_script`
 
-success(run(plot_cmd)) || error("Plotting failed!")
+result = run(plot_cmd)
+if !success(result)
+    error("Plotting failed with exit code $(result.exitcode)")
+end
 println()
 
 # Generate HTML report
@@ -64,13 +61,12 @@ println("Step 4/4: Generating HTML report...")
 println("-" ^ 70)
 html_script = joinpath(benchmark_dir, "generate_html_report.jl")
 
-html_cmd = `julia --project=$plot_project -e "
-    import Pkg
-    Pkg.instantiate()
-    include(\"$html_script\")
-"`
+html_cmd = `julia --project=$plot_project $html_script`
 
-success(run(html_cmd)) || error("HTML generation failed!")
+result = run(html_cmd)
+if !success(result)
+    error("HTML generation failed with exit code $(result.exitcode)")
+end
 println()
 
 println("=" ^ 70)

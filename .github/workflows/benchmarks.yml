@@ -86,7 +86,9 @@ jobs:
         run: |
           cd benchmark
           julia --project=. run_benchmarks.jl 2>&1 | tee benchmark_log.txt
-          echo "benchmark_exit_code=$?" >> $GITHUB_OUTPUT
+          exit_code=${PIPESTATUS[0]}
+          echo "benchmark_exit_code=$exit_code" >> $GITHUB_OUTPUT
+          exit $exit_code
 
       - name: Check benchmark results
         id: check_results
@@ -223,8 +225,16 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📦 **Artifacts:** Download benchmark results from the artifacts section above" >> $GITHUB_STEP_SUMMARY
 
-      - name: Fail if benchmarks failed
-        if: steps.run_benchmarks.outputs.benchmark_exit_code != '0' && steps.run_benchmarks.outputs.benchmark_exit_code != ''
+      - name: Check benchmark status
+        if: always()
         run: |
-          echo "❌ Benchmarks failed with exit code ${{ steps.run_benchmarks.outputs.benchmark_exit_code }}"
-          exit 1
+          exit_code="${{ steps.run_benchmarks.outputs.benchmark_exit_code }}"
+          if [ -z "$exit_code" ]; then
+            echo "⚠️ No exit code captured, assuming failure"
+            exit 1
+          elif [ "$exit_code" != "0" ]; then
+            echo "❌ Benchmarks failed with exit code $exit_code"
+            exit 1
+          else
+            echo "✅ Benchmarks completed successfully"
+          fi

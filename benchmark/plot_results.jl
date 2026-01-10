@@ -5,6 +5,10 @@ Plot benchmark results for FFTA.jl vs FFTW.jl
 Plots runtime/N vs N to show scaling behavior, with separate plots for each category
 """
 
+# Ensure packages are installed
+import Pkg
+Pkg.instantiate()
+
 using JSON
 using Plots
 

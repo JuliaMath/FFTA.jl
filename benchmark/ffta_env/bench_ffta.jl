@@ -9,6 +9,7 @@ This script runs in an isolated environment with only FFTA.jl loaded.
 import Pkg
 ffta_path = joinpath(@__DIR__, "..", "..")
 Pkg.develop(path=ffta_path)
+Pkg.instantiate()
 
 using FFTA
 using BenchmarkTools
