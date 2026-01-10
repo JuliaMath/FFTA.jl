@@ -42,43 +42,32 @@ jobs:
             ${{ runner.os }}-julia-benchmark-
             ${{ runner.os }}-julia-
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libfftw3-dev
-
       - name: Setup benchmark environments
         run: |
           # Setup FFTA environment
           echo "Setting up FFTA environment..."
-          cd benchmark/ffta_env
-          julia --project=. -e '
+          julia --project=benchmark/ffta_env -e '
             import Pkg
-            Pkg.develop(path="../..")
+            Pkg.develop(path=".")
             Pkg.instantiate()
             Pkg.precompile()
           '
-          cd ../..
 
           # Setup FFTW environment
           echo "Setting up FFTW environment..."
-          cd benchmark/fftw_env
-          julia --project=. -e '
+          julia --project=benchmark/fftw_env -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
           '
-          cd ../..
 
           # Setup plotting environment
           echo "Setting up plotting environment..."
-          cd benchmark
-          julia --project=. -e '
+          julia --project=benchmark -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
           '
-          cd ..
 
       - name: Run benchmarks
         id: run_benchmarks
