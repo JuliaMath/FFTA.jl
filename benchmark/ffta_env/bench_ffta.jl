@@ -14,11 +14,28 @@ using FFTA
 using BenchmarkTools
 using JSON
 
-# Array sizes to test (powers of 2 and composite numbers)
-const SIZES = [
-    8, 16, 32, 64, 128, 256, 512, 1024,
-    2048, 4096, 8192, 16384, 32768
-]
+# Array sizes categorized by structure
+const ODD_POWERS_OF_2 = [2^p for p in 1:2:15]  # 2, 8, 32, 128, 512, 2048, 8192, 32768
+const EVEN_POWERS_OF_2 = [2^p for p in 2:2:14]  # 4, 16, 64, 256, 1024, 4096, 16384
+const POWERS_OF_3 = [3^p for p in 1:9]  # 3, 9, 27, 81, 243, 729, 2187, 6561, 19683
+const COMPOSITE = [2*3*4*5*7]  # 840
+
+# Combine all sizes and categorize them
+const SIZE_CATEGORIES = Dict{Int, String}()
+for n in ODD_POWERS_OF_2
+    SIZE_CATEGORIES[n] = "odd_power_of_2"
+end
+for n in EVEN_POWERS_OF_2
+    SIZE_CATEGORIES[n] = "even_power_of_2"
+end
+for n in POWERS_OF_3
+    SIZE_CATEGORIES[n] = "power_of_3"
+end
+for n in COMPOSITE
+    SIZE_CATEGORIES[n] = "composite"
+end
+
+const ALL_SIZES = sort(collect(keys(SIZE_CATEGORIES)))
 
 # Number of samples for each benchmark
 const SAMPLES = 100
@@ -28,12 +45,14 @@ function benchmark_ffta()
     results = Dict{String, Any}()
     results["package"] = "FFTA"
     results["data"] = []
+    results["categories"] = SIZE_CATEGORIES
 
     println("Benchmarking FFTA.jl...")
     println("=" ^ 50)
 
-    for n in SIZES
-        println("Testing array size: $n")
+    for n in ALL_SIZES
+        category = SIZE_CATEGORIES[n]
+        println("Testing array size: $n (category: $category)")
 
         # Benchmark complex FFT
         x = randn(ComplexF64, n)
@@ -44,6 +63,7 @@ function benchmark_ffta()
 
         push!(results["data"], Dict(
             "size" => n,
+            "category" => category,
             "median_time" => median_time,
             "runtime_per_element" => runtime_per_element,
             "mean_time" => mean(trial).time * 1e-9,
