@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFTA.jl vs FFTW.jl Performance Benchmark</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+        }
+        .summary {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .plot-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .plot {
+            width: 100%;
+            height: 600px;
+        }
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .faster {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        .slower {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        .metadata {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .info-box {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>FFTA.jl vs FFTW.jl Performance Benchmark Report</h1>
+
+    <div class="info-box">
+        <strong>Note:</strong> This benchmark compares FFTA.jl (a pure Julia FFT implementation) against
+        FFTW.jl (Julia bindings to the FFTW C library). Each package was benchmarked in a separate
+        Julia process to ensure isolation and prevent interference.
+    </div>
+
+    <div class="summary">
+        <h2>Benchmark Configuration</h2>
+        <div class="metadata">
+            <strong>Benchmarking Tool:</strong> BenchmarkTools.jl<br>
+            <strong>Samples per size:</strong> 100<br>
+            <strong>Evaluations per sample:</strong> 10<br>
+            <strong>Data type:</strong> ComplexF64<br>
+            <strong>Total array sizes tested:</strong> 50<br>
+            <strong>Report generated:</strong> 2026-01-11T10:46:47.700<br>
+        </div>
+
+        <h3>Array Size Categories</h3>
+        <ul>
+            <li><strong>Odd Powers of 2:</strong> 2¹, 2³, 2⁵, 2⁷, 2⁹, 2¹¹, 2¹³, 2¹⁵ (2, 8, 32, 128, 512, 2048, 8192, 32768)</li>
+            <li><strong>Even Powers of 2:</strong> 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)</li>
+            <li><strong>Powers of 3:</strong> 3¹, 3², 3³, 3⁴, 3⁵, 3⁶, 3⁷, 3⁸, 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)</li>
+            <li><strong>Composite:</strong> 3, 12, 60, 300, 2100, 23100 (cumulative products of 3,4,5,5,7,11)</li>
+            <li><strong>Primes:</strong> 20 logarithmically-spaced prime numbers up to 20,000</li>
+        </ul>
+    </div>
+
+    <h2>Performance Visualizations</h2>
+
+    <div class="plot-container">
+        <h3>Runtime/N vs N (All Categories)</h3>
+        <div id="plot-combined" class="plot"></div>
+    </div>
+
+    <div class="plot-container">
+        <h3>Absolute Runtime (All Categories)</h3>
+        <div id="plot-absolute" class="plot"></div>
+    </div>
+
+    <div class="category-grid">
+        <div class="plot-container">
+            <h3>Odd Powers of 2</h3>
+            <div id="plot-odd" class="plot" style="height: 400px;"></div>
+        </div>
+        <div class="plot-container">
+            <h3>Even Powers of 2</h3>
+            <div id="plot-even" class="plot" style="height: 400px;"></div>
+        </div>
+        <div class="plot-container">
+            <h3>Powers of 3</h3>
+            <div id="plot-power3" class="plot" style="height: 400px;"></div>
+        </div>
+        <div class="plot-container">
+            <h3>Composite</h3>
+            <div id="plot-composite" class="plot" style="height: 400px;"></div>
+        </div>
+        <div class="plot-container">
+            <h3>Prime Numbers</h3>
+            <div id="plot-primes" class="plot" style="height: 400px;"></div>
+        </div>
+    </div>
+
+    <h2>Detailed Results</h2>
+    <div id="results-tables"></div>
+
+    <div class="summary" style="margin-top: 40px;">
+        <h2>Interpretation</h2>
+        <p>
+            The plots show <strong>Runtime/N vs N</strong>, which normalizes the runtime by the array size.
+            For an optimal FFT implementation with O(N log N) complexity, this should scale as O(log N).
+        </p>
+        <p>
+            <strong>Key Observations:</strong>
+        </p>
+        <ul>
+            <li>Powers of 2 typically show the best performance for FFT algorithms due to the Cooley-Tukey radix-2 algorithm</li>
+            <li>Powers of 3 may use different factorization strategies</li>
+            <li>Composite numbers test the FFT implementation's ability to handle general factorizations</li>
+            <li>FFTA.jl is a pure Julia implementation, while FFTW.jl wraps optimized C code</li>
+            <li>Interactive plots allow zooming and hovering for detailed inspection</li>
+        </ul>
+    </div>
+
+    <script>
+        // Embedded benchmark data
+        const fftaResults = {"data":[{"median_time":4.343e-7,"mean_time":4.5449400000000005e-7,"size":2,"min_time":4.1580000000000006e-7,"category":"prime","max_time":1.4548e-6,"runtime_per_element":2.1715e-7},{"median_time":4.4035000000000005e-7,"mean_time":4.7288500000000007e-7,"size":2,"min_time":4.1970000000000003e-7,"category":"prime","max_time":1.5178e-6,"runtime_per_element":2.2017500000000002e-7},{"median_time":4.794e-7,"mean_time":4.98679e-7,"size":3,"min_time":4.649e-7,"category":"prime","max_time":1.7073000000000002e-6,"runtime_per_element":1.5980000000000001e-7},{"median_time":4.894e-7,"mean_time":5.3275e-7,"size":3,"min_time":4.679e-7,"category":"prime","max_time":2.8173000000000005e-6,"runtime_per_element":1.6313333333333335e-7},{"median_time":4.8385e-7,"mean_time":5.226770000000001e-7,"size":3,"min_time":4.688e-7,"category":"prime","max_time":2.4566e-6,"runtime_per_element":1.6128333333333334e-7},{"median_time":4.5935000000000005e-7,"mean_time":4.765600000000001e-7,"size":4,"min_time":4.4380000000000004e-7,"category":"even_power_of_2","max_time":1.4677000000000002e-6,"runtime_per_element":1.1483750000000001e-7},{"median_time":4.899e-7,"mean_time":5.068580000000001e-7,"size":5,"min_time":4.789e-7,"category":"prime","max_time":1.6732000000000001e-6,"runtime_per_element":9.798e-8},{"median_time":5.0945e-7,"mean_time":5.507880000000001e-7,"size":7,"min_time":4.949e-7,"category":"prime","max_time":2.641e-6,"runtime_per_element":7.277857142857143e-8},{"median_time":5.169500000000001e-7,"mean_time":5.331630000000001e-7,"size":8,"min_time":5.03e-7,"category":"odd_power_of_2","max_time":1.6431e-6,"runtime_per_element":6.461875000000001e-8},{"median_time":5.5655e-7,"mean_time":5.757549999999999e-7,"size":9,"min_time":5.41e-7,"category":"power_of_3","max_time":1.7944000000000001e-6,"runtime_per_element":6.183888888888889e-8},{"median_time":9.187500000000001e-7,"mean_time":9.75004e-7,"size":12,"min_time":8.847000000000001e-7,"category":"composite","max_time":2.9897e-6,"runtime_per_element":7.656250000000001e-8},{"median_time":7.774000000000001e-7,"mean_time":8.183489999999999e-7,"size":13,"min_time":7.654e-7,"category":"prime","max_time":2.8243000000000002e-6,"runtime_per_element":5.98e-8},{"median_time":5.159500000000001e-7,"mean_time":5.63543e-7,"size":16,"min_time":4.939e-7,"category":"even_power_of_2","max_time":4.1257e-6,"runtime_per_element":3.224687500000001e-8},{"median_time":1.7653e-6,"mean_time":1.819125e-6,"size":23,"min_time":1.7443e-6,"category":"prime","max_time":3.5717e-6,"runtime_per_element":7.675217391304349e-8},{"median_time":7.795e-7,"mean_time":8.219860000000003e-7,"size":27,"min_time":7.534000000000001e-7,"category":"power_of_3","max_time":2.5297e-6,"runtime_per_element":2.887037037037037e-8},{"median_time":8.100000000000001e-7,"mean_time":8.451160000000002e-7,"size":32,"min_time":7.854e-7,"category":"odd_power_of_2","max_time":2.7862e-6,"runtime_per_element":2.5312500000000002e-8},{"median_time":4.2931000000000005e-6,"mean_time":4.36404e-6,"size":37,"min_time":4.266e-6,"category":"prime","max_time":6.2417e-6,"runtime_per_element":1.1602972972972975e-7},{"median_time":1.0892400000000001e-5,"mean_time":1.1018312e-5,"size":59,"min_time":1.08543e-5,"category":"prime","max_time":1.24854e-5,"runtime_per_element":1.846169491525424e-7},{"median_time":2.5317e-6,"mean_time":2.59365e-6,"size":60,"min_time":2.4095e-6,"category":"composite","max_time":4.5857e-6,"runtime_per_element":4.2194999999999995e-8},{"median_time":8.2255e-7,"mean_time":9.10379e-7,"size":64,"min_time":7.443e-7,"category":"even_power_of_2","max_time":2.4356e-6,"runtime_per_element":1.285234375e-8},{"median_time":1.6556e-6,"mean_time":1.7046440000000003e-6,"size":81,"min_time":1.604e-6,"category":"power_of_3","max_time":3.3524000000000003e-6,"runtime_per_element":2.0439506172839506e-8},{"median_time":2.99118e-5,"mean_time":3.0197361000000007e-5,"size":97,"min_time":2.9845200000000004e-5,"category":"prime","max_time":3.27737e-5,"runtime_per_element":3.0836907216494847e-7},{"median_time":2.78325e-6,"mean_time":2.844381e-6,"size":128,"min_time":2.6199e-6,"category":"odd_power_of_2","max_time":4.4815e-6,"runtime_per_element":2.1744140625e-8},{"median_time":8.05757e-5,"mean_time":8.052825e-5,"size":157,"min_time":7.9653e-5,"category":"prime","max_time":8.19112e-5,"runtime_per_element":5.132210191082803e-7},{"median_time":5.047e-6,"mean_time":5.154728000000001e-6,"size":243,"min_time":4.8902e-6,"category":"power_of_3","max_time":7.3619e-6,"runtime_per_element":2.076954732510288e-8},{"median_time":2.4917500000000003e-6,"mean_time":2.5654390000000005e-6,"size":256,"min_time":2.3083000000000004e-6,"category":"even_power_of_2","max_time":6.005300000000001e-6,"runtime_per_element":9.733398437500001e-9},{"median_time":0.00021743575000000002,"mean_time":0.00021771288700000004,"size":257,"min_time":0.0002170025,"category":"prime","max_time":0.0002217324,"runtime_per_element":8.460535019455253e-7},{"median_time":1.2087200000000002e-5,"mean_time":1.2290195000000001e-5,"size":300,"min_time":1.16118e-5,"category":"composite","max_time":1.6852700000000002e-5,"runtime_per_element":4.029066666666667e-8},{"median_time":0.0005543771499999999,"mean_time":0.000554622844,"size":409,"min_time":0.0005532806000000001,"category":"prime","max_time":0.0005612726999999999,"runtime_per_element":1.3554453545232272e-6},{"median_time":1.0832900000000001e-5,"mean_time":1.1013030000000003e-5,"size":512,"min_time":1.06049e-5,"category":"odd_power_of_2","max_time":1.55603e-5,"runtime_per_element":2.1158007812500002e-8},{"median_time":0.0015073412,"mean_time":0.0015078188360000003,"size":673,"min_time":0.0015061926000000002,"category":"prime","max_time":0.0015181461000000002,"runtime_per_element":2.239734323922734e-6},{"median_time":1.585485e-5,"mean_time":1.6054413000000002e-5,"size":729,"min_time":1.55733e-5,"category":"power_of_3","max_time":1.79908e-5,"runtime_per_element":2.1748765432098763e-8},{"median_time":8.62075e-6,"mean_time":8.806006000000001e-6,"size":1024,"min_time":8.3527e-6,"category":"even_power_of_2","max_time":1.1506700000000001e-5,"runtime_per_element":8.418701171875e-9},{"median_time":0.00397153195,"mean_time":0.003971889389,"size":1091,"min_time":0.0039684945,"category":"prime","max_time":0.0039922228,"runtime_per_element":3.6402675985334555e-6},{"median_time":0.0105544824,"mean_time":0.010555506297916668,"size":1777,"min_time":0.010547902500000001,"category":"prime","max_time":0.010574450400000001,"runtime_per_element":5.939494879009567e-6},{"median_time":4.99693e-5,"mean_time":5.3941978e-5,"size":2048,"min_time":4.8466e-5,"category":"odd_power_of_2","max_time":6.99343e-5,"runtime_per_element":2.4399072265625e-8},{"median_time":0.00012216240000000001,"mean_time":0.000111703371,"size":2100,"min_time":9.76163e-5,"category":"composite","max_time":0.0001288379,"runtime_per_element":5.8172571428571434e-8},{"median_time":5.342930000000001e-5,"mean_time":5.340086400000001e-5,"size":2187,"min_time":5.239440000000001e-5,"category":"power_of_3","max_time":5.7414800000000005e-5,"runtime_per_element":2.443040695016004e-8},{"median_time":0.0277450299,"mean_time":0.02774919055789474,"size":2879,"min_time":0.027741612500000002,"category":"prime","max_time":0.027789612600000003,"runtime_per_element":9.637037130948245e-6},{"median_time":6.516605000000001e-5,"mean_time":6.030774400000001e-5,"size":4096,"min_time":3.90525e-5,"category":"even_power_of_2","max_time":7.47347e-5,"runtime_per_element":1.5909680175781252e-8},{"median_time":0.07314913220000001,"mean_time":0.07315104897142856,"size":4673,"min_time":0.07313164040000002,"category":"prime","max_time":0.0731809781,"runtime_per_element":1.5653569912261932e-5},{"median_time":0.00022166170000000003,"mean_time":0.000219477313,"size":6561,"min_time":0.0001784575,"category":"power_of_3","max_time":0.00024363310000000002,"runtime_per_element":3.378474317939339e-8},{"median_time":0.1927025152,"mean_time":0.19271289746666667,"size":7583,"min_time":0.1927017222,"category":"prime","max_time":0.192734455,"runtime_per_element":2.541243771594356e-5},{"median_time":0.00027613035,"mean_time":0.00027461048000000004,"size":8192,"min_time":0.0002261723,"category":"odd_power_of_2","max_time":0.0002941301,"runtime_per_element":3.370731811523437e-8},{"median_time":0.5090233506,"mean_time":0.5090233506,"size":12323,"min_time":0.5090233506,"category":"prime","max_time":0.5090233506,"runtime_per_element":4.130677193865131e-5},{"median_time":0.0002923191,"mean_time":0.000256729018,"size":16384,"min_time":0.0001802078,"category":"even_power_of_2","max_time":0.0003395233,"runtime_per_element":1.7841741943359376e-8},{"median_time":0.0007517428000000001,"mean_time":0.0006917950630000001,"size":19683,"min_time":0.0006096642,"category":"power_of_3","max_time":0.0007748748000000001,"runtime_per_element":3.819249098206575e-8},{"median_time":1.3423234774000001,"mean_time":1.3423234774000001,"size":19997,"min_time":1.3423234774000001,"category":"prime","max_time":1.3423234774000001,"runtime_per_element":6.712624280642097e-5},{"median_time":0.0016078203500000002,"mean_time":0.0016975649430000003,"size":23100,"min_time":0.0015994611000000002,"category":"composite","max_time":0.0020654689,"runtime_per_element":6.960261255411256e-8},{"median_time":0.0010731651499999999,"mean_time":0.0011536220650000002,"size":32768,"min_time":0.0010662682,"category":"odd_power_of_2","max_time":0.0015742486,"runtime_per_element":3.275040130615234e-8}],"package":"FFTA","categories":{"5":"prime","60":"composite","32":"odd_power_of_2","1024":"even_power_of_2","673":"prime","2187":"power_of_3","64":"even_power_of_2","4673":"prime","19997":"prime","2048":"odd_power_of_2","16384":"even_power_of_2","4":"even_power_of_2","13":"prime","6561":"power_of_3","12":"composite","4096":"even_power_of_2","256":"even_power_of_2","23":"prime","300":"composite","1091":"prime","12323":"prime","7":"prime","7583":"prime","59":"prime","243":"power_of_3","2":"prime","27":"power_of_3","157":"prime","257":"prime","729":"power_of_3","16":"even_power_of_2","81":"power_of_3","19683":"power_of_3","9":"power_of_3","8192":"odd_power_of_2","23100":"composite","512":"odd_power_of_2","409":"prime","1777":"prime","128":"odd_power_of_2","32768":"odd_power_of_2","2879":"prime","8":"odd_power_of_2","37":"prime","3":"prime","2100":"composite","97":"prime"}};
+        const fftwResults = {"data":[{"median_time":2.79975e-6,"mean_time":2.9871350000000005e-6,"size":2,"min_time":2.6109000000000003e-6,"category":"prime","max_time":1.4410100000000001e-5,"runtime_per_element":1.399875e-6},{"median_time":2.63495e-6,"mean_time":2.7690619999999997e-6,"size":2,"min_time":2.3444000000000004e-6,"category":"prime","max_time":6.037300000000001e-6,"runtime_per_element":1.317475e-6},{"median_time":2.6344e-6,"mean_time":2.8428540000000003e-6,"size":3,"min_time":2.2833000000000002e-6,"category":"prime","max_time":1.8456700000000002e-5,"runtime_per_element":8.781333333333334e-7},{"median_time":2.62045e-6,"mean_time":2.830218e-6,"size":3,"min_time":2.3133000000000004e-6,"category":"prime","max_time":1.76141e-5,"runtime_per_element":8.734833333333334e-7},{"median_time":2.632e-6,"mean_time":2.8567220000000003e-6,"size":3,"min_time":2.3044000000000003e-6,"category":"prime","max_time":1.7027e-5,"runtime_per_element":8.773333333333334e-7},{"median_time":2.8689e-6,"mean_time":3.0964600000000005e-6,"size":4,"min_time":2.4316e-6,"category":"even_power_of_2","max_time":1.6094200000000003e-5,"runtime_per_element":7.17225e-7},{"median_time":2.8970000000000004e-6,"mean_time":3.1042940000000003e-6,"size":5,"min_time":2.4766e-6,"category":"prime","max_time":1.48549e-5,"runtime_per_element":5.794000000000001e-7},{"median_time":2.8879000000000003e-6,"mean_time":3.1509980000000004e-6,"size":7,"min_time":2.3995e-6,"category":"prime","max_time":1.63958e-5,"runtime_per_element":4.125571428571429e-7},{"median_time":2.8373000000000003e-6,"mean_time":3.040251e-6,"size":8,"min_time":2.3805000000000003e-6,"category":"odd_power_of_2","max_time":1.5267700000000003e-5,"runtime_per_element":3.5466250000000004e-7},{"median_time":2.8683500000000007e-6,"mean_time":3.081546e-6,"size":9,"min_time":2.4656e-6,"category":"power_of_3","max_time":1.45533e-5,"runtime_per_element":3.187055555555556e-7},{"median_time":3.1158000000000003e-6,"mean_time":3.3155539999999996e-6,"size":12,"min_time":2.7271e-6,"category":"composite","max_time":8.911700000000001e-6,"runtime_per_element":2.5965e-7},{"median_time":3.16145e-6,"mean_time":3.375291e-6,"size":13,"min_time":2.632e-6,"category":"prime","max_time":1.5860700000000002e-5,"runtime_per_element":2.431884615384615e-7},{"median_time":3.1714000000000002e-6,"mean_time":3.377595e-6,"size":16,"min_time":2.7843e-6,"category":"even_power_of_2","max_time":1.81831e-5,"runtime_per_element":1.9821250000000002e-7},{"median_time":2.5322e-6,"mean_time":2.9959460000000004e-6,"size":23,"min_time":2.4186e-6,"category":"prime","max_time":4.3131800000000006e-5,"runtime_per_element":1.1009565217391305e-7},{"median_time":5.57345e-6,"mean_time":5.797758999999999e-6,"size":27,"min_time":5.31e-6,"category":"power_of_3","max_time":1.1196000000000001e-5,"runtime_per_element":2.0642407407407406e-7},{"median_time":3.1885e-6,"mean_time":3.5219840000000007e-6,"size":32,"min_time":2.8343000000000005e-6,"category":"odd_power_of_2","max_time":2.7805200000000003e-5,"runtime_per_element":9.9640625e-8},{"median_time":4.6511900000000004e-5,"mean_time":5.1113568e-5,"size":37,"min_time":4.16052e-5,"category":"prime","max_time":0.00043532280000000003,"runtime_per_element":1.2570783783783784e-6},{"median_time":1.385705e-5,"mean_time":1.4318882e-5,"size":59,"min_time":1.3303000000000001e-5,"category":"prime","max_time":4.13056e-5,"runtime_per_element":2.3486525423728813e-7},{"median_time":6.00575e-6,"mean_time":6.619965e-6,"size":60,"min_time":5.4722e-6,"category":"composite","max_time":4.79591e-5,"runtime_per_element":1.0009583333333334e-7},{"median_time":6.3149e-6,"mean_time":6.719895000000001e-6,"size":64,"min_time":5.731800000000001e-6,"category":"even_power_of_2","max_time":3.0419200000000002e-5,"runtime_per_element":9.86703125e-8},{"median_time":5.8595e-6,"mean_time":7.048525999999999e-6,"size":81,"min_time":5.4843e-6,"category":"power_of_3","max_time":0.0001140703,"runtime_per_element":7.233950617283951e-8},{"median_time":2.3977550000000002e-5,"mean_time":2.5130501000000002e-5,"size":97,"min_time":2.30283e-5,"category":"prime","max_time":0.00011185010000000002,"runtime_per_element":2.4719123711340206e-7},{"median_time":6.165600000000001e-6,"mean_time":8.329339e-6,"size":128,"min_time":5.9532e-6,"category":"odd_power_of_2","max_time":0.0002152935,"runtime_per_element":4.8168750000000006e-8},{"median_time":1.861995e-5,"mean_time":1.9656838000000002e-5,"size":157,"min_time":1.8231200000000003e-5,"category":"prime","max_time":0.0001040554,"runtime_per_element":1.1859840764331211e-7},{"median_time":1.2103200000000001e-5,"mean_time":1.3338349e-5,"size":243,"min_time":1.18513e-5,"category":"power_of_3","max_time":0.0001189355,"runtime_per_element":4.9807407407407414e-8},{"median_time":6.810300000000001e-6,"mean_time":8.202673e-6,"size":256,"min_time":6.584300000000001e-6,"category":"even_power_of_2","max_time":0.00013560870000000003,"runtime_per_element":2.6602734375000003e-8},{"median_time":2.78658e-5,"mean_time":2.8853363e-5,"size":257,"min_time":2.7309200000000003e-5,"category":"prime","max_time":9.74439e-5,"runtime_per_element":1.084272373540856e-7},{"median_time":7.079300000000001e-6,"mean_time":8.325832e-6,"size":300,"min_time":6.7496000000000006e-6,"category":"composite","max_time":0.00011843730000000001,"runtime_per_element":2.359766666666667e-8},{"median_time":6.0312150000000005e-5,"mean_time":5.9230006e-5,"size":409,"min_time":5.1100900000000004e-5,"category":"prime","max_time":0.0001308797,"runtime_per_element":1.4746246943765283e-7},{"median_time":8.289600000000001e-6,"mean_time":8.683352e-6,"size":512,"min_time":7.871800000000001e-6,"category":"odd_power_of_2","max_time":3.0931e-5,"runtime_per_element":1.6190625000000002e-8},{"median_time":7.755110000000001e-5,"mean_time":8.521389799999999e-5,"size":673,"min_time":7.55217e-5,"category":"prime","max_time":0.00013968120000000002,"runtime_per_element":1.1523194650817237e-7},{"median_time":1.4602450000000001e-5,"mean_time":1.5037591e-5,"size":729,"min_time":1.4167600000000001e-5,"category":"power_of_3","max_time":3.6180900000000005e-5,"runtime_per_element":2.0030795610425242e-8},{"median_time":1.02988e-5,"mean_time":1.1465919e-5,"size":1024,"min_time":9.952700000000002e-6,"category":"even_power_of_2","max_time":0.0001119712,"runtime_per_element":1.0057421875e-8},{"median_time":0.0001285494,"mean_time":0.00012096648399999998,"size":1091,"min_time":0.0001006449,"category":"prime","max_time":0.0001374671,"runtime_per_element":1.1782713107241062e-7},{"median_time":0.00015552645000000003,"mean_time":0.000172316805,"size":1777,"min_time":0.0001508752,"category":"prime","max_time":0.000206128,"runtime_per_element":8.7521918964547e-8},{"median_time":1.53003e-5,"mean_time":1.560265e-5,"size":2048,"min_time":1.4472200000000002e-5,"category":"odd_power_of_2","max_time":2.6623000000000002e-5,"runtime_per_element":7.470849609375e-9},{"median_time":3.069015e-5,"mean_time":3.1336046000000005e-5,"size":2100,"min_time":2.94704e-5,"category":"composite","max_time":4.866740000000001e-5,"runtime_per_element":1.4614357142857145e-8},{"median_time":3.0320950000000003e-5,"mean_time":3.1420193e-5,"size":2187,"min_time":2.9548500000000003e-5,"category":"power_of_3","max_time":6.09304e-5,"runtime_per_element":1.3864174668495657e-8},{"median_time":0.00028808334999999997,"mean_time":0.00027643576899999997,"size":2879,"min_time":0.0002138144,"category":"prime","max_time":0.00032284,"runtime_per_element":1.0006368530739839e-7},{"median_time":4.00953e-5,"mean_time":4.0357016000000004e-5,"size":4096,"min_time":3.9043300000000006e-5,"category":"even_power_of_2","max_time":5.06911e-5,"runtime_per_element":9.7888916015625e-9},{"median_time":0.00045950665000000005,"mean_time":0.000435568016,"size":4673,"min_time":0.0003379875,"category":"prime","max_time":0.00047049620000000006,"runtime_per_element":9.833225979028462e-8},{"median_time":6.735680000000001e-5,"mean_time":6.850704200000002e-5,"size":6561,"min_time":5.63377e-5,"category":"power_of_3","max_time":0.00023516500000000002,"runtime_per_element":1.0266239902453895e-8},{"median_time":0.00089655055,"mean_time":0.000838452214,"size":7583,"min_time":0.0006936717,"category":"prime","max_time":0.0010054953,"runtime_per_element":1.1823164314914942e-7},{"median_time":9.59028e-5,"mean_time":9.803004600000001e-5,"size":8192,"min_time":9.45994e-5,"category":"odd_power_of_2","max_time":0.000235247,"runtime_per_element":1.1706884765625e-8},{"median_time":0.0009776516000000002,"mean_time":0.0010839307010000001,"size":12323,"min_time":0.0009585002,"category":"prime","max_time":0.0014316935000000001,"runtime_per_element":7.933551894830806e-8},{"median_time":0.00020123285,"mean_time":0.00021816385900000001,"size":16384,"min_time":0.0001983273,"category":"even_power_of_2","max_time":0.0003521883,"runtime_per_element":1.2282278442382812e-8},{"median_time":0.00019050170000000003,"mean_time":0.000216311326,"size":19683,"min_time":0.0001858149,"category":"power_of_3","max_time":0.00039164440000000005,"runtime_per_element":9.678489051465733e-9},{"median_time":0.0015042856000000002,"mean_time":0.0016358415780000004,"size":19997,"min_time":0.0014944061000000002,"category":"prime","max_time":0.0020078402,"runtime_per_element":7.522556383457519e-8},{"median_time":0.00020218010000000003,"mean_time":0.000207077276,"size":23100,"min_time":0.00020060870000000004,"category":"composite","max_time":0.00032381609999999997,"runtime_per_element":8.752385281385283e-9},{"median_time":0.00041769175,"mean_time":0.000460283355,"size":32768,"min_time":0.0004072131,"category":"odd_power_of_2","max_time":0.0006346378000000001,"runtime_per_element":1.274694061279297e-8}],"package":"FFTW","categories":{"5":"prime","60":"composite","32":"odd_power_of_2","1024":"even_power_of_2","673":"prime","2187":"power_of_3","64":"even_power_of_2","4673":"prime","19997":"prime","2048":"odd_power_of_2","16384":"even_power_of_2","4":"even_power_of_2","13":"prime","6561":"power_of_3","12":"composite","4096":"even_power_of_2","256":"even_power_of_2","23":"prime","300":"composite","1091":"prime","12323":"prime","7":"prime","7583":"prime","59":"prime","243":"power_of_3","2":"prime","27":"power_of_3","157":"prime","257":"prime","729":"power_of_3","16":"even_power_of_2","81":"power_of_3","19683":"power_of_3","9":"power_of_3","8192":"odd_power_of_2","23100":"composite","512":"odd_power_of_2","409":"prime","1777":"prime","128":"odd_power_of_2","32768":"odd_power_of_2","2879":"prime","8":"odd_power_of_2","37":"prime","3":"prime","2100":"composite","97":"prime"}};
+
+        const categories = {
+            'odd_power_of_2': { name: 'Odd Powers of 2', color: 'blue' },
+            'even_power_of_2': { name: 'Even Powers of 2', color: 'red' },
+            'power_of_3': { name: 'Powers of 3', color: 'green' },
+            'composite': { name: 'Composite', color: 'purple' },
+            'prime': { name: 'Prime Numbers', color: 'orange' }
+        };
+
+        // Helper function to filter data by category
+        function filterByCategory(data, category) {
+            return data.filter(d => d.category === category);
+        }
+
+        // Create combined Runtime/N plot
+        function createCombinedPlot() {
+            const traces = [];
+
+            for (const [catKey, catInfo] of Object.entries(categories)) {
+                const fftaCat = filterByCategory(fftaResults.data, catKey);
+                const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                if (fftaCat.length > 0) {
+                    traces.push({
+                        x: fftaCat.map(d => d.size),
+                        y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTA: ' + catInfo.name,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 8, color: catInfo.color },
+                        line: { width: 2, color: catInfo.color }
+                    });
+                }
+
+                if (fftwCat.length > 0) {
+                    traces.push({
+                        x: fftwCat.map(d => d.size),
+                        y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTW: ' + catInfo.name,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 8, symbol: 'square', color: catInfo.color },
+                        line: { width: 2, dash: 'dash', color: catInfo.color }
+                    });
+                }
+            }
+
+            const layout = {
+                xaxis: { title: 'Array Length (N)', type: 'log' },
+                yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                hovermode: 'closest',
+                showlegend: true,
+                legend: { x: 1.05, y: 1 }
+            };
+
+            Plotly.newPlot('plot-combined', traces, layout, { responsive: true });
+        }
+
+        // Create absolute runtime plot
+        function createAbsolutePlot() {
+            const traces = [];
+
+            for (const [catKey, catInfo] of Object.entries(categories)) {
+                const fftaCat = filterByCategory(fftaResults.data, catKey);
+                const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                if (fftaCat.length > 0) {
+                    traces.push({
+                        x: fftaCat.map(d => d.size),
+                        y: fftaCat.map(d => d.median_time * 1e6),
+                        name: 'FFTA: ' + catInfo.name,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 8, color: catInfo.color },
+                        line: { width: 2, color: catInfo.color }
+                    });
+                }
+
+                if (fftwCat.length > 0) {
+                    traces.push({
+                        x: fftwCat.map(d => d.size),
+                        y: fftwCat.map(d => d.median_time * 1e6),
+                        name: 'FFTW: ' + catInfo.name,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 8, symbol: 'square', color: catInfo.color },
+                        line: { width: 2, dash: 'dash', color: catInfo.color }
+                    });
+                }
+            }
+
+            const layout = {
+                xaxis: { title: 'Array Length (N)', type: 'log' },
+                yaxis: { title: 'Runtime (microseconds)', type: 'log' },
+                hovermode: 'closest',
+                showlegend: true,
+                legend: { x: 1.05, y: 1 }
+            };
+
+            Plotly.newPlot('plot-absolute', traces, layout, { responsive: true });
+        }
+
+        // Create category-specific plots
+        function createCategoryPlot(catKey, divId) {
+            const fftaCat = filterByCategory(fftaResults.data, catKey);
+            const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+            if (fftaCat.length === 0 && fftwCat.length === 0) return;
+
+            const traces = [];
+            const catInfo = categories[catKey];
+
+            if (fftaCat.length > 0) {
+                traces.push({
+                    x: fftaCat.map(d => d.size),
+                    y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                    name: 'FFTA.jl',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    marker: { size: 10, color: catInfo.color },
+                    line: { width: 2, color: catInfo.color }
+                });
+            }
+
+            if (fftwCat.length > 0) {
+                traces.push({
+                    x: fftwCat.map(d => d.size),
+                    y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                    name: 'FFTW.jl',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    marker: { size: 10, symbol: 'square', color: 'gray' },
+                    line: { width: 2, color: 'gray' }
+                });
+            }
+
+            const layout = {
+                xaxis: { title: 'Array Length (N)', type: 'log' },
+                yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                hovermode: 'closest',
+                showlegend: true
+            };
+
+            Plotly.newPlot(divId, traces, layout, { responsive: true });
+        }
+
+        // Create detailed results tables
+        function createResultsTables() {
+            let html = '';
+
+            for (const [catKey, catInfo] of Object.entries(categories)) {
+                const fftaCat = filterByCategory(fftaResults.data, catKey);
+                const fftwCat = filterByCategory(fftwResults.data, catKey);
+
+                if (fftaCat.length === 0 && fftwCat.length === 0) continue;
+
+                html += '<h3>' + catInfo.name + '</h3>';
+                html += '<table>';
+                html += '<thead><tr>';
+                html += '<th>Array Size (N)</th>';
+                html += '<th>FFTA Time (μs)</th>';
+                html += '<th>FFTW Time (μs)</th>';
+                html += '<th>FFTA Runtime/N (ns)</th>';
+                html += '<th>FFTW Runtime/N (ns)</th>';
+                html += '<th>Speedup</th>';
+                html += '</tr></thead>';
+                html += '<tbody>';
+
+                const allSizes = [...new Set([...fftaCat.map(d => d.size), ...fftwCat.map(d => d.size)])].sort((a, b) => a - b);
+
+                for (const size of allSizes) {
+                    const fftaData = fftaCat.find(d => d.size === size);
+                    const fftwData = fftwCat.find(d => d.size === size);
+
+                    if (fftaData && fftwData) {
+                        const fftaTime = (fftaData.median_time * 1e6).toFixed(3);
+                        const fftwTime = (fftwData.median_time * 1e6).toFixed(3);
+                        const fftaPerN = (fftaData.runtime_per_element * 1e9).toFixed(3);
+                        const fftwPerN = (fftwData.runtime_per_element * 1e9).toFixed(3);
+                        const speedup = fftwData.median_time / fftaData.median_time;
+                        const speedupClass = speedup > 1 ? 'faster' : 'slower';
+                        const speedupText = speedup > 1
+                            ? speedup.toFixed(2) + 'x (FFTA faster)'
+                            : (1/speedup).toFixed(2) + 'x (FFTW faster)';
+
+                        html += '<tr>';
+                        html += '<td>' + size + '</td>';
+                        html += '<td>' + fftaTime + '</td>';
+                        html += '<td>' + fftwTime + '</td>';
+                        html += '<td>' + fftaPerN + '</td>';
+                        html += '<td>' + fftwPerN + '</td>';
+                        html += '<td class="' + speedupClass + '">' + speedupText + '</td>';
+                        html += '</tr>';
+                    }
+                }
+
+                html += '</tbody></table>';
+            }
+
+            document.getElementById('results-tables').innerHTML = html;
+        }
+
+        // Initialize all plots on page load
+        window.addEventListener('load', function() {
+            createCombinedPlot();
+            createAbsolutePlot();
+            createCategoryPlot('odd_power_of_2', 'plot-odd');
+            createCategoryPlot('even_power_of_2', 'plot-even');
+            createCategoryPlot('power_of_3', 'plot-power3');
+            createCategoryPlot('composite', 'plot-composite');
+            createCategoryPlot('prime', 'plot-primes');
+            createResultsTables();
+        });
+    </script>
+
+    <footer style="margin-top: 40px; padding: 20px; text-align: center; color: #7f8c8d; border-top: 1px solid #ddd;">
+        <p>FFTA.jl Performance Benchmark Suite</p>
+        <p>Interactive plots powered by Plotly.js</p>
+    </footer>
+</body>
+</html>
