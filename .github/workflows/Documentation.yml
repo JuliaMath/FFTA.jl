@@ -12,13 +12,80 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check for local benchmark results
+        id: check_local
+        run: |
+          if [ -f "benchmark/benchmark_report.html" ]; then
+            echo "✅ Found local benchmark results"
+            echo "has_local=true" >> $GITHUB_OUTPUT
+            mkdir -p docs/src/assets/benchmarks
+            cp benchmark/benchmark_report.html docs/src/assets/benchmarks/
+            cp benchmark/*.json docs/src/assets/benchmarks/ 2>/dev/null || true
+            echo "Copied local benchmark results to docs/src/assets/benchmarks/"
+          else
+            echo "⚠️ No local benchmark results found"
+            echo "has_local=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download benchmark results from CI (if no local results)
+        if: steps.check_local.outputs.has_local != 'true'
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: benchmarks.yml
+          name_is_regexp: true
+          name: benchmark-results-.*
+          path: docs/src/benchmarks-temp/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          search_artifacts: true
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      - name: Move benchmark results to correct location
+        if: steps.check_local.outputs.has_local != 'true'
+        run: |
+          # Check what was downloaded
+          if [ -d "docs/src/benchmarks-temp" ]; then
+            echo "Downloaded directory structure:"
+            find docs/src/benchmarks-temp -type f -o -type d
+
+            # Create target directory
+            mkdir -p docs/src/assets/benchmarks
+
+            # Find the benchmark_report.html file and move everything from its directory
+            report_file=$(find docs/src/benchmarks-temp -name "benchmark_report.html" -type f | head -1)
+
+            if [ -n "$report_file" ]; then
+              report_dir=$(dirname "$report_file")
+              echo "Found benchmark files in: $report_dir"
+              mv "$report_dir"/* docs/src/assets/benchmarks/
+              echo "Moved files to docs/src/assets/benchmarks/"
+            else
+              echo "No benchmark_report.html found in downloaded artifacts"
+            fi
+
+            # Cleanup temp directory
+            rm -rf docs/src/benchmarks-temp
+          fi
+
+      - name: Check for benchmark results
+        run: |
+          if [ -f "docs/src/assets/benchmarks/benchmark_report.html" ]; then
+            echo "✅ Benchmark report found"
+            ls -lh docs/src/assets/benchmarks/
+          else
+            echo "⚠️ No benchmark report found - docs will show placeholder"
+          fi
+
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1.9'
+
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+
       - name: Build and deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl
