@@ -1,0 +1,133 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:  # Allow manual triggering
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'benchmark/**'
+      - '.github/workflows/benchmarks.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'benchmark/**'
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          arch: x64
+
+      - name: Cache Julia packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.julia/artifacts
+            ~/.julia/packages
+            ~/.julia/compiled
+          key: ${{ runner.os }}-julia-benchmark-${{ hashFiles('**/Project.toml', '**/Manifest.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-julia-benchmark-
+            ${{ runner.os }}-julia-
+
+      - name: Setup benchmark environments
+        run: |
+          # Setup FFTA environment
+          echo "Setting up FFTA environment..."
+          julia --project=benchmark/ffta_env -e '
+            import Pkg
+            Pkg.develop(path=".")
+            Pkg.instantiate()
+            Pkg.precompile()
+          '
+
+          # Setup FFTW environment
+          echo "Setting up FFTW environment..."
+          julia --project=benchmark/fftw_env -e '
+            import Pkg
+            Pkg.instantiate()
+            Pkg.precompile()
+          '
+
+          # Setup plotting environment
+          echo "Setting up plotting environment..."
+          julia --project=benchmark -e '
+            import Pkg
+            Pkg.instantiate()
+            Pkg.precompile()
+          '
+
+      - name: Run benchmarks
+        id: run_benchmarks
+        run: |
+          cd benchmark
+          set -o pipefail
+          julia --project=. run_benchmarks.jl 2>&1 | tee benchmark_log.txt
+
+      - name: Check benchmark results
+        id: check_results
+        if: success()
+        run: |
+          if [ -f "benchmark/results_ffta.json" ] && [ -f "benchmark/results_fftw.json" ]; then
+            echo "results_exist=true" >> $GITHUB_OUTPUT
+            echo "✅ Benchmark results generated successfully"
+          else
+            echo "results_exist=false" >> $GITHUB_OUTPUT
+            echo "❌ Benchmark results not found"
+            exit 1
+          fi
+
+          if [ -f "benchmark/benchmark_report.html" ]; then
+            echo "html_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ HTML report generated successfully"
+          else
+            echo "html_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ HTML report not found"
+            exit 1
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.run_id }}
+          path: |
+            benchmark/benchmark_report.html
+            benchmark/*.json
+            benchmark/benchmark_log.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Generate job summary
+        if: success()
+        run: |
+          echo "## 📊 Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Benchmarks completed successfully!**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count total tests
+          FFTA_COUNT=$(grep -o '"size"' benchmark/results_ffta.json | wc -l)
+          echo "- Tested $FFTA_COUNT array sizes across 5 categories" >> $GITHUB_STEP_SUMMARY
+          echo "- Categories: Odd powers of 2, Even powers of 2, Powers of 3, Composite, Prime numbers" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "📈 **Outputs generated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Interactive HTML report with embedded plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Category-specific performance plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Combined performance comparison plots" >> $GITHUB_STEP_SUMMARY
+          echo "- Raw JSON results for further analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **Artifacts:** Download benchmark results from the artifacts section above" >> $GITHUB_STEP_SUMMARY
