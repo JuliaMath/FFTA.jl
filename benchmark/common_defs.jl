@@ -28,11 +28,11 @@ const SELECTED_PRIMES = begin
     sort!(selected)
 end
 
-# Odd powers of 2
-const ODD_POWERS_OF_2 = [2^i for i in 1:2:15]
+# Odd powers of 2 (up to 2^19 = 524288)
+const ODD_POWERS_OF_2 = [2^i for i in 1:2:19]
 
-# Even powers of 2
-const EVEN_POWERS_OF_2 = [2^i for i in 2:2:14]
+# Even powers of 2 (up to 2^20 = 1048576)
+const EVEN_POWERS_OF_2 = [2^i for i in 2:2:20]
 
 # Powers of 3
 const POWERS_OF_3 = [3^i for i in 1:9]

@@ -103,12 +103,12 @@ The benchmarks test various array sizes categorized by their mathematical struct
 
 ### Categories
 
-1. **Odd Powers of 2**: 2¹, 2³, 2⁵, 2⁷, 2⁹, 2¹¹, 2¹³, 2¹⁵
-   - Sizes: 2, 8, 32, 128, 512, 2048, 8192, 32768
+1. **Odd Powers of 2**: 2¹, 2³, 2⁵, 2⁷, 2⁹, 2¹¹, 2¹³, 2¹⁵, 2¹⁷, 2¹⁹
+   - Sizes: 2, 8, 32, 128, 512, 2048, 8192, 32768, 131072, 524288
    - Tests radix-2 FFT with odd exponents
 
-2. **Even Powers of 2**: 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴
-   - Sizes: 4, 16, 64, 256, 1024, 4096, 16384
+2. **Even Powers of 2**: 2², 2⁴, 2⁶, 2⁸, 2¹⁰, 2¹², 2¹⁴, 2¹⁶, 2¹⁸, 2²⁰
+   - Sizes: 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576
    - Tests radix-2 FFT with even exponents (often doubly-even cases)
 
 3. **Powers of 3**: 3¹, 3², 3³, 3⁴, 3⁵, 3⁶, 3⁷, 3⁸, 3⁹
