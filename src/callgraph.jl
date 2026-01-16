@@ -1,6 +1,6 @@
 @enum Direction FFT_FORWARD=-1 FFT_BACKWARD=1
 @enum Pow24 POW2=2 POW4=1
-@enum FFTEnum compositeFFT dft pow2FFT pow3FFT pow4FFT
+@enum FFTEnum COMPOSITE_FFT DFT POW3_FFT POW2RADIX4_FFT
 
 """
 $(TYPEDSIGNATURES)
@@ -74,20 +74,20 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         pow = _ispow24(N)
         if !isnothing(pow)
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, pow == POW2 ? pow2FFT : pow4FFT, N, s_in, s_out, w))
+            push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out, w))
             return 1
         end
     end
     if N % 3 == 0
         if nextpow(3, N) == N
             push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, pow3FFT, N, s_in, s_out, w))
+            push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out, w))
             return 1
         end
     end
     if N == 1 || Primes.isprime(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out, w))
+        push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
         return 1
     end
     Ns = [first(x) for x in collect(Primes.factor(N)) for _ in 1:last(x)]
@@ -104,12 +104,12 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         N1 = N_cp[N1_idx]
     end
     N2 = N ÷ N1
-    push!(nodes, CallGraphNode(0, 0, dft, N, s_in, s_out, w))
+    push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
     sz = length(nodes)
     push!(workspace, Vector{T}(undef, N))
     left_len = CallGraphNode!(nodes, N1, workspace, N2, N2*s_out)
     right_len = CallGraphNode!(nodes, N2, workspace, N1*s_in, 1)
-    nodes[sz] = CallGraphNode(1, 1 + left_len, compositeFFT, N, s_in, s_out, w)
+    nodes[sz] = CallGraphNode(1, 1 + left_len, COMPOSITE_FFT, N, s_in, s_out, w)
     return 1 + left_len + right_len
 end
 
