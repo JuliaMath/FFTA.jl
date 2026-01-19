@@ -29,13 +29,14 @@ end
 const SAMPLES = 100
 const EVALS = 10
 
-function benchmark_fftw()
+function benchmark_fftw_complex()
     results = Dict{String, Any}()
     results["package"] = "FFTW"
+    results["fft_type"] = "complex"
     results["data"] = []
     results["categories"] = SIZE_CATEGORIES
 
-    println("Benchmarking FFTW.jl...")
+    println("Benchmarking FFTW.jl (Complex FFT)...")
     println("=" ^ 50)
 
     for n in ALL_SIZES
@@ -73,5 +74,51 @@ function benchmark_fftw()
     return results
 end
 
-# Run benchmark
-benchmark_fftw()
+function benchmark_fftw_real()
+    results = Dict{String, Any}()
+    results["package"] = "FFTW"
+    results["fft_type"] = "real"
+    results["data"] = []
+    results["categories"] = SIZE_CATEGORIES
+
+    println("\nBenchmarking FFTW.jl (Real FFT)...")
+    println("=" ^ 50)
+
+    for n in ALL_SIZES
+        category = SIZE_CATEGORIES[n]
+        println("Testing array size: $n (category: $category)")
+
+        # Benchmark real FFT
+        x = randn(Float64, n)
+        trial = @benchmark rfft($x) samples=SAMPLES evals=EVALS
+
+        median_time = median(trial).time * 1e-9  # Convert to seconds
+        runtime_per_element = median_time / n
+
+        push!(results["data"], Dict(
+            "size" => n,
+            "category" => category,
+            "median_time" => median_time,
+            "runtime_per_element" => runtime_per_element,
+            "mean_time" => mean(trial).time * 1e-9,
+            "min_time" => minimum(trial).time * 1e-9,
+            "max_time" => maximum(trial).time * 1e-9
+        ))
+
+        println("  Median time: $(median_time * 1e6) μs")
+        println("  Time per element: $(runtime_per_element * 1e9) ns")
+    end
+
+    # Save results to JSON
+    output_file = joinpath(@__DIR__, "..", "results_fftw_rfft.json")
+    open(output_file, "w") do io
+        JSON.print(io, results, 2)
+    end
+
+    println("\nResults saved to: $output_file")
+    return results
+end
+
+# Run benchmarks
+benchmark_fftw_complex()
+benchmark_fftw_real()

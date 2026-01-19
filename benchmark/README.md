@@ -78,15 +78,18 @@ The `docs/make.jl` script will automatically detect and copy benchmark results f
 
 The benchmark suite generates:
 
-1. **results_ffta.json**: Raw benchmark data for FFTA.jl
-2. **results_fftw.json**: Raw benchmark data for FFTW.jl
-3. **benchmark_report.html**: Self-contained interactive HTML report with:
+1. **results_ffta.json**: Raw benchmark data for FFTA.jl (complex FFT)
+2. **results_fftw.json**: Raw benchmark data for FFTW.jl (complex FFT)
+3. **results_ffta_rfft.json**: Raw benchmark data for FFTA.jl (real FFT)
+4. **results_fftw_rfft.json**: Raw benchmark data for FFTW.jl (real FFT)
+5. **benchmark_report.html**: Self-contained interactive HTML report with:
    - Embedded JSON data
    - Client-side Plotly.js charts (no external files needed)
-   - Combined Runtime/N vs N plot for all categories
-   - Absolute runtime plot for all categories
+   - Combined Runtime/N vs N plot for all categories (both complex and real FFT)
+   - Absolute runtime plot for all categories (both complex and real FFT)
    - Individual plots for each category (odd/even powers of 2, powers of 3, composite, primes)
    - Detailed results tables with speedup comparisons
+   - Separate sections for complex FFT and real FFT results
 
 ## Metrics
 
@@ -124,7 +127,11 @@ The benchmarks test various array sizes categorized by their mathematical struct
    - Prime sizes require specialized FFT algorithms (e.g., Bluestein's algorithm)
    - Logarithmic spacing ensures coverage from small to large primes
 
-All tests use complex double-precision arrays (`ComplexF64`)
+All tests are run for both:
+- **Complex FFT**: Complex double-precision input arrays (`ComplexF64`)
+- **Real FFT**: Real double-precision input arrays (`Float64`)
+
+The real FFT (rfft) is optimized for real-valued input and exploits conjugate symmetry, typically achieving ~2x speedup over complex FFT for real data.
 
 ## Interpreting Results
 
