@@ -14,20 +14,31 @@ using Dates
 using Primes
 
 function generate_html_report()
-    # Load results
+    # Load complex FFT results
     ffta_file = joinpath(@__DIR__, "results_ffta.json")
     fftw_file = joinpath(@__DIR__, "results_fftw.json")
 
     if !isfile(ffta_file) || !isfile(fftw_file)
-        error("Benchmark results not found. Run benchmarks first!")
+        error("Complex FFT benchmark results not found. Run benchmarks first!")
     end
 
     ffta_results = JSON.parsefile(ffta_file)
     fftw_results = JSON.parsefile(fftw_file)
 
+    # Load real FFT results (optional)
+    ffta_rfft_file = joinpath(@__DIR__, "results_ffta_rfft.json")
+    fftw_rfft_file = joinpath(@__DIR__, "results_fftw_rfft.json")
+
+    has_rfft_results = isfile(ffta_rfft_file) && isfile(fftw_rfft_file)
+
+    ffta_rfft_results = has_rfft_results ? JSON.parsefile(ffta_rfft_file) : nothing
+    fftw_rfft_results = has_rfft_results ? JSON.parsefile(fftw_rfft_file) : nothing
+
     # Embed JSON data in JavaScript
     ffta_json = JSON.json(ffta_results)
     fftw_json = JSON.json(fftw_results)
+    ffta_rfft_json = has_rfft_results ? JSON.json(ffta_rfft_results) : "null"
+    fftw_rfft_json = has_rfft_results ? JSON.json(fftw_rfft_results) : "null"
 
     # Start HTML document
     html = """
@@ -145,7 +156,7 @@ function generate_html_report()
                 <strong>Benchmarking Tool:</strong> BenchmarkTools.jl<br>
                 <strong>Samples per size:</strong> 100<br>
                 <strong>Evaluations per sample:</strong> 10<br>
-                <strong>Data type:</strong> ComplexF64<br>
+                <strong>FFT Types:</strong> Complex FFT (ComplexF64) $(has_rfft_results ? "and Real FFT (Float64)" : "")<br>
                 <strong>Total array sizes tested:</strong> $(length(ffta_results["data"]))<br>
                 <strong>Report generated:</strong> $(now())<br>
             </div>
@@ -161,6 +172,8 @@ function generate_html_report()
         </div>
 
         <h2>Performance Visualizations</h2>
+
+        <h3 style="color: #2c3e50; margin-top: 30px;">Complex FFT (ComplexF64 → ComplexF64)</h3>
 
         <div class="plot-container">
             <h3>Runtime/N vs N (All Categories)</h3>
@@ -195,8 +208,54 @@ function generate_html_report()
             </div>
         </div>
 
-        <h2>Detailed Results</h2>
+        <h2>Detailed Results - Complex FFT</h2>
         <div id="results-tables"></div>
+
+        <div id="rfft-section">
+            <h2 style="color: #2c3e50; margin-top: 50px;">Real FFT (Float64 → ComplexF64)</h2>
+
+            <div class="info-box">
+                <strong>Real FFT:</strong> The real FFT (rfft) is optimized for real-valued input data and produces
+                approximately N/2+1 complex output values, exploiting the conjugate symmetry property. This makes it
+                roughly 2x faster and more memory-efficient than complex FFT for real-valued signals.
+            </div>
+
+            <div class="plot-container">
+                <h3>Runtime/N vs N (All Categories)</h3>
+                <div id="plot-rfft-combined" class="plot"></div>
+            </div>
+
+            <div class="plot-container">
+                <h3>Absolute Runtime (All Categories)</h3>
+                <div id="plot-rfft-absolute" class="plot"></div>
+            </div>
+
+            <div class="category-grid">
+                <div class="plot-container">
+                    <h3>Odd Powers of 2</h3>
+                    <div id="plot-rfft-odd" class="plot" style="height: 400px;"></div>
+                </div>
+                <div class="plot-container">
+                    <h3>Even Powers of 2</h3>
+                    <div id="plot-rfft-even" class="plot" style="height: 400px;"></div>
+                </div>
+                <div class="plot-container">
+                    <h3>Powers of 3</h3>
+                    <div id="plot-rfft-power3" class="plot" style="height: 400px;"></div>
+                </div>
+                <div class="plot-container">
+                    <h3>Composite</h3>
+                    <div id="plot-rfft-composite" class="plot" style="height: 400px;"></div>
+                </div>
+                <div class="plot-container">
+                    <h3>Prime Numbers</h3>
+                    <div id="plot-rfft-primes" class="plot" style="height: 400px;"></div>
+                </div>
+            </div>
+
+            <h2>Detailed Results - Real FFT</h2>
+            <div id="results-tables-rfft"></div>
+        </div>
 
         <div class="summary" style="margin-top: 40px;">
             <h2>Interpretation</h2>
@@ -211,6 +270,7 @@ function generate_html_report()
                 <li>Powers of 2 typically show the best performance for FFT algorithms due to the Cooley-Tukey radix-2 algorithm</li>
                 <li>Powers of 3 may use different factorization strategies</li>
                 <li>Composite numbers test the FFT implementation's ability to handle general factorizations</li>
+                <li>Real FFTs (rfft) exploit conjugate symmetry and are generally ~2x faster than complex FFTs for real-valued input</li>
                 <li>FFTA.jl is a pure Julia implementation, while FFTW.jl wraps optimized C code</li>
                 <li>Interactive plots allow zooming and hovering for detailed inspection</li>
             </ul>
@@ -220,6 +280,9 @@ function generate_html_report()
             // Embedded benchmark data
             const fftaResults = $ffta_json;
             const fftwResults = $fftw_json;
+            const fftaRfftResults = $ffta_rfft_json;
+            const fftwRfftResults = $fftw_rfft_json;
+            const hasRfftResults = fftaRfftResults !== null && fftwRfftResults !== null;
 
             const categories = {
                 'odd_power_of_2': { name: 'Odd Powers of 2', color: 'blue' },
@@ -422,8 +485,202 @@ function generate_html_report()
                 document.getElementById('results-tables').innerHTML = html;
             }
 
+            // Create Real FFT plots
+            function createRfftCombinedPlot() {
+                if (!hasRfftResults) return;
+
+                const traces = [];
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaRfftResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwRfftResults.data, catKey);
+
+                    if (fftaCat.length > 0) {
+                        traces.push({
+                            x: fftaCat.map(d => d.size),
+                            y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                            name: 'FFTA: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, color: catInfo.color },
+                            line: { width: 2, color: catInfo.color }
+                        });
+                    }
+
+                    if (fftwCat.length > 0) {
+                        traces.push({
+                            x: fftwCat.map(d => d.size),
+                            y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                            name: 'FFTW: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, symbol: 'square', color: catInfo.color },
+                            line: { width: 2, dash: 'dash', color: catInfo.color }
+                        });
+                    }
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true,
+                    legend: { x: 1.05, y: 1 }
+                };
+
+                Plotly.newPlot('plot-rfft-combined', traces, layout, { responsive: true });
+            }
+
+            function createRfftAbsolutePlot() {
+                if (!hasRfftResults) return;
+
+                const traces = [];
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaRfftResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwRfftResults.data, catKey);
+
+                    if (fftaCat.length > 0) {
+                        traces.push({
+                            x: fftaCat.map(d => d.size),
+                            y: fftaCat.map(d => d.median_time * 1e6),
+                            name: 'FFTA: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, color: catInfo.color },
+                            line: { width: 2, color: catInfo.color }
+                        });
+                    }
+
+                    if (fftwCat.length > 0) {
+                        traces.push({
+                            x: fftwCat.map(d => d.size),
+                            y: fftwCat.map(d => d.median_time * 1e6),
+                            name: 'FFTW: ' + catInfo.name,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { size: 8, symbol: 'square', color: catInfo.color },
+                            line: { width: 2, dash: 'dash', color: catInfo.color }
+                        });
+                    }
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime (microseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true,
+                    legend: { x: 1.05, y: 1 }
+                };
+
+                Plotly.newPlot('plot-rfft-absolute', traces, layout, { responsive: true });
+            }
+
+            function createRfftCategoryPlot(catKey, divId) {
+                if (!hasRfftResults) return;
+
+                const fftaCat = filterByCategory(fftaRfftResults.data, catKey);
+                const fftwCat = filterByCategory(fftwRfftResults.data, catKey);
+
+                if (fftaCat.length === 0 && fftwCat.length === 0) return;
+
+                const traces = [];
+                const catInfo = categories[catKey];
+
+                if (fftaCat.length > 0) {
+                    traces.push({
+                        x: fftaCat.map(d => d.size),
+                        y: fftaCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTA.jl',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 10, color: catInfo.color },
+                        line: { width: 2, color: catInfo.color }
+                    });
+                }
+
+                if (fftwCat.length > 0) {
+                    traces.push({
+                        x: fftwCat.map(d => d.size),
+                        y: fftwCat.map(d => d.runtime_per_element * 1e9),
+                        name: 'FFTW.jl',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { size: 10, symbol: 'square', color: 'gray' },
+                        line: { width: 2, color: 'gray' }
+                    });
+                }
+
+                const layout = {
+                    xaxis: { title: 'Array Length (N)', type: 'log' },
+                    yaxis: { title: 'Runtime / N (nanoseconds)', type: 'log' },
+                    hovermode: 'closest',
+                    showlegend: true
+                };
+
+                Plotly.newPlot(divId, traces, layout, { responsive: true });
+            }
+
+            function createRfftResultsTables() {
+                if (!hasRfftResults) return;
+
+                let html = '';
+
+                for (const [catKey, catInfo] of Object.entries(categories)) {
+                    const fftaCat = filterByCategory(fftaRfftResults.data, catKey);
+                    const fftwCat = filterByCategory(fftwRfftResults.data, catKey);
+
+                    if (fftaCat.length === 0 && fftwCat.length === 0) continue;
+
+                    html += '<h3>' + catInfo.name + '</h3>';
+                    html += '<table>';
+                    html += '<thead><tr>';
+                    html += '<th>Array Size (N)</th>';
+                    html += '<th>FFTA Time (μs)</th>';
+                    html += '<th>FFTW Time (μs)</th>';
+                    html += '<th>FFTA Runtime/N (ns)</th>';
+                    html += '<th>FFTW Runtime/N (ns)</th>';
+                    html += '<th>Speedup</th>';
+                    html += '</tr></thead>';
+                    html += '<tbody>';
+
+                    const allSizes = [...new Set([...fftaCat.map(d => d.size), ...fftwCat.map(d => d.size)])].sort((a, b) => a - b);
+
+                    for (const size of allSizes) {
+                        const fftaData = fftaCat.find(d => d.size === size);
+                        const fftwData = fftwCat.find(d => d.size === size);
+
+                        if (fftaData && fftwData) {
+                            const fftaTime = (fftaData.median_time * 1e6).toFixed(3);
+                            const fftwTime = (fftwData.median_time * 1e6).toFixed(3);
+                            const fftaPerN = (fftaData.runtime_per_element * 1e9).toFixed(3);
+                            const fftwPerN = (fftwData.runtime_per_element * 1e9).toFixed(3);
+                            const speedup = fftwData.median_time / fftaData.median_time;
+                            const speedupClass = speedup > 1 ? 'faster' : 'slower';
+                            const speedupText = speedup > 1
+                                ? speedup.toFixed(2) + 'x (FFTA faster)'
+                                : (1/speedup).toFixed(2) + 'x (FFTW faster)';
+
+                            html += '<tr>';
+                            html += '<td>' + size + '</td>';
+                            html += '<td>' + fftaTime + '</td>';
+                            html += '<td>' + fftwTime + '</td>';
+                            html += '<td>' + fftaPerN + '</td>';
+                            html += '<td>' + fftwPerN + '</td>';
+                            html += '<td class="' + speedupClass + '">' + speedupText + '</td>';
+                            html += '</tr>';
+                        }
+                    }
+
+                    html += '</tbody></table>';
+                }
+
+                document.getElementById('results-tables-rfft').innerHTML = html;
+            }
+
             // Initialize all plots on page load
             window.addEventListener('load', function() {
+                // Complex FFT plots
                 createCombinedPlot();
                 createAbsolutePlot();
                 createCategoryPlot('odd_power_of_2', 'plot-odd');
@@ -432,6 +689,20 @@ function generate_html_report()
                 createCategoryPlot('composite', 'plot-composite');
                 createCategoryPlot('prime', 'plot-primes');
                 createResultsTables();
+
+                // Real FFT plots (if data available)
+                if (hasRfftResults) {
+                    createRfftCombinedPlot();
+                    createRfftAbsolutePlot();
+                    createRfftCategoryPlot('odd_power_of_2', 'plot-rfft-odd');
+                    createRfftCategoryPlot('even_power_of_2', 'plot-rfft-even');
+                    createRfftCategoryPlot('power_of_3', 'plot-rfft-power3');
+                    createRfftCategoryPlot('composite', 'plot-rfft-composite');
+                    createRfftCategoryPlot('prime', 'plot-rfft-primes');
+                    createRfftResultsTables();
+                } else {
+                    document.getElementById('rfft-section').style.display = 'none';
+                }
             });
         </script>
 
