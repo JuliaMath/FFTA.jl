@@ -1,6 +1,5 @@
 # Plans
-
-abstract type FFTAPlan{T,N} <: AbstractFFTs.Plan{T} end
+abstract type FFTAPlan{T,N} end
 
 struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
 
@@ -42,7 +41,7 @@ Base.size(p::FFTAPlan{<:Any,N}) where N = ntuple(Base.Fix1(size, p), Val{N}())
 
 Base.complex(p::FFTAPlan_re{T,N}) where {T,N} = FFTAPlan_cx{T,N}(p.callgraph, p.region, p.dir, p.pinv)
 
-function AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex, N}
+function plan_fft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_cx{T} where {T <: Complex, N}
     FFTN = length(region)
     if FFTN == 1
         g = CallGraph{T}(size(x,region[]))
@@ -59,7 +58,7 @@ function AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPl
     end
 end
 
-function AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_cx{T} where {T <: Complex,N}
+function plan_bfft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_cx{T} where {T <: Complex,N}
     FFTN = length(region)
     if FFTN == 1
         g = CallGraph{T}(size(x,region[]))
@@ -76,7 +75,7 @@ function AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAP
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAPlan_re{Complex{T}} where {T <: Real,N}
+function plan_rfft(x::AbstractArray{T,N}, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_re{Complex{T}} where {T <: Real,N}
     FFTN = length(region)
     if FFTN == 1
         n = size(x, region[])
@@ -98,7 +97,7 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...)::FFTAP
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region; kwargs...)::FFTAPlan_re{T} where {T,N}
+function plan_brfft(x::AbstractArray{T,N}, len::Int, region::Union{Int,AbstractVector} = 1:N)::FFTAPlan_re{T} where {T,N}
     FFTN = length(region)
     if FFTN == 1
         # For even length problems, we solve the real problem with
