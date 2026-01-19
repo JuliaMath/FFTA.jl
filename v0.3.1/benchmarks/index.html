@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Benchmarks · FFTA</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../dev/">FFTA</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../dev/">Development Tools</a></li><li class="is-active"><a class="tocitem" href>Benchmarks</a><ul class="internal"><li><a class="tocitem" href="#Interactive-Benchmark-Report"><span>Interactive Benchmark Report</span></a></li><li><a class="tocitem" href="#Running-Benchmarks-Locally"><span>Running Benchmarks Locally</span></a></li><li><a class="tocitem" href="#Benchmark-Methodology"><span>Benchmark Methodology</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Benchmarks</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Benchmarks</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/JuliaMath/FFTA.jl/blob/main/docs/src/benchmarks.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Performance-Benchmarks"><a class="docs-heading-anchor" href="#Performance-Benchmarks">Performance Benchmarks</a><a id="Performance-Benchmarks-1"></a><a class="docs-heading-anchor-permalink" href="#Performance-Benchmarks" title="Permalink"></a></h1><p>This page contains performance benchmarks comparing FFTA.jl against FFTW.jl.</p><h2 id="Interactive-Benchmark-Report"><a class="docs-heading-anchor" href="#Interactive-Benchmark-Report">Interactive Benchmark Report</a><a id="Interactive-Benchmark-Report-1"></a><a class="docs-heading-anchor-permalink" href="#Interactive-Benchmark-Report" title="Permalink"></a></h2><style>
+.benchmark-note {
+    margin: 20px 0;
+    padding: 15px;
+    border-left: 4px solid #3498db;
+    border-radius: 4px;
+    background-color: rgba(52, 152, 219, 0.1);
+}
+.benchmark-warning {
+    padding: 20px;
+    border: 1px solid rgba(255, 193, 7, 0.5);
+    border-radius: 4px;
+    margin: 20px 0;
+    background-color: rgba(255, 193, 7, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+    .benchmark-note {
+        background-color: rgba(52, 152, 219, 0.15);
+        border-left-color: #5dade2;
+    }
+    .benchmark-warning {
+        background-color: rgba(255, 193, 7, 0.15);
+        border-color: rgba(255, 193, 7, 0.6);
+    }
+}
+</style>
+<div class="benchmark-note">
+    <p><strong>Note:</strong> The interactive benchmark report below is generated automatically by the CI pipeline when benchmarks are run.</p>
+    <p>If you don't see the report, it means benchmarks haven't been run yet for this version of the documentation.</p>
+</div><div id="benchmark-container">
+    <iframe src="../assets/benchmarks/benchmark_report.html" style="width: 100%; height: 2000px; border: 1px solid #ddd; border-radius: 4px;" onload="this.style.height=(this.contentWindow.document.body.scrollHeight+50)+'px';">
+        <p>Your browser does not support iframes. <a href="../assets/benchmarks/benchmark_report.html">Click here to view the benchmark report</a>.</p>
+    </iframe>
+</div>
+
+<script>
+// Check if benchmark report exists
+fetch('../assets/benchmarks/benchmark_report.html')
+    .then(response => {
+        if (!response.ok) {
+            document.getElementById('benchmark-container').innerHTML =
+                '<div class="benchmark-warning">' +
+                '<h3>⚠️ Benchmark Report Not Available</h3>' +
+                '<p>The benchmark report has not been generated yet. Benchmarks are automatically run on:</p>' +
+                '<ul>' +
+                '<li>Pull requests that modify source code</li>' +
+                '<li>Pushes to the main branch</li>' +
+                '<li>Manual workflow dispatch</li>' +
+                '</ul>' +
+                '<p>To generate benchmarks locally, run:</p>' +
+                '<pre><code>cd benchmark\njulia run_benchmarks.jl</code></pre>' +
+                '</div>';
+        }
+    })
+    .catch(error => {
+        document.getElementById('benchmark-container').innerHTML =
+            '<div class="benchmark-warning">' +
+            '<h3>⚠️ Benchmark Report Not Available</h3>' +
+            '<p>The benchmark report could not be loaded.</p>' +
+            '</div>';
+    });
+</script><h2 id="Running-Benchmarks-Locally"><a class="docs-heading-anchor" href="#Running-Benchmarks-Locally">Running Benchmarks Locally</a><a id="Running-Benchmarks-Locally-1"></a><a class="docs-heading-anchor-permalink" href="#Running-Benchmarks-Locally" title="Permalink"></a></h2><p>To run the benchmarks on your local machine:</p><pre><code class="language-bash hljs">cd benchmark
+julia run_benchmarks.jl</code></pre><p>This will:</p><ol><li>Run FFTA benchmarks in an isolated environment</li><li>Run FFTW benchmarks in an isolated environment</li><li>Generate an interactive HTML report at <code>benchmark/benchmark_report.html</code></li></ol><p>For more details, see the <a href="https://github.com/dannys4/FFTA.jl/tree/main/benchmark">benchmark README</a>.</p><h2 id="Benchmark-Methodology"><a class="docs-heading-anchor" href="#Benchmark-Methodology">Benchmark Methodology</a><a id="Benchmark-Methodology-1"></a><a class="docs-heading-anchor-permalink" href="#Benchmark-Methodology" title="Permalink"></a></h2><p>The benchmark suite compares FFTA.jl (a pure Julia FFT implementation) against FFTW.jl (Julia bindings to the FFTW C library).</p><h3 id="Array-Size-Categories"><a class="docs-heading-anchor" href="#Array-Size-Categories">Array Size Categories</a><a id="Array-Size-Categories-1"></a><a class="docs-heading-anchor-permalink" href="#Array-Size-Categories" title="Permalink"></a></h3><p>Benchmarks are organized into categories based on array size structure:</p><ul><li><strong>Odd Powers of 2</strong>: 2¹, 2³, 2⁵, ..., 2¹⁵ (2, 8, 32, 128, 512, 2048, 8192, 32768)</li><li><strong>Even Powers of 2</strong>: 2², 2⁴, 2⁶, ..., 2¹⁴ (4, 16, 64, 256, 1024, 4096, 16384)</li><li><strong>Powers of 3</strong>: 3¹, 3², 3³, ..., 3⁹ (3, 9, 27, 81, 243, 729, 2187, 6561, 19683)</li><li><strong>Composite</strong>: 3, 12, 60, 300, 2100, 23100 (cumulative products of 3, 4, 5, 5, 7, 11)</li><li><strong>Prime Numbers</strong>: 20 logarithmically-spaced primes up to 20,000</li></ul><h3 id="Metrics"><a class="docs-heading-anchor" href="#Metrics">Metrics</a><a id="Metrics-1"></a><a class="docs-heading-anchor-permalink" href="#Metrics" title="Permalink"></a></h3><p>For each array size, we measure:</p><ul><li><strong>Median time</strong>: Median execution time across 100 samples</li><li><strong>Runtime/N</strong>: Runtime divided by array length (shows scaling efficiency)</li><li><strong>Mean/Min/Max time</strong>: Statistical measures of performance</li></ul><h3 id="Isolation"><a class="docs-heading-anchor" href="#Isolation">Isolation</a><a id="Isolation-1"></a><a class="docs-heading-anchor-permalink" href="#Isolation" title="Permalink"></a></h3><p>Each package is benchmarked in a completely separate Julia process to ensure:</p><ul><li>FFTW doesn&#39;t take precedence over FFTA when both are loaded</li><li>Fair and accurate performance comparison</li><li>No cross-contamination between implementations</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../dev/">« Development Tools</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Monday 19 January 2026 20:04">Monday 19 January 2026</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
