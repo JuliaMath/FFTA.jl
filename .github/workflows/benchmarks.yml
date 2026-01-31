@@ -1,19 +1,16 @@
 name: Benchmarks
-
 on:
-  workflow_dispatch:  # Allow manual triggering
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'benchmark/**'
   pull_request:
     paths:
       - 'src/**'
       - 'benchmark/**'
       - '.github/workflows/benchmarks.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'benchmark/**'
-
+  workflow_dispatch:  # Allow manual triggering
 jobs:
   benchmark:
     name: Performance Benchmarks
@@ -22,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@v2
@@ -31,7 +28,7 @@ jobs:
           arch: x64
 
       - name: Cache Julia packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.julia/artifacts
@@ -46,7 +43,7 @@ jobs:
         run: |
           # Setup FFTA environment
           echo "Setting up FFTA environment..."
-          julia --project=benchmark/ffta_env -e '
+          julia --color=yes --project=benchmark/ffta_env -e '
             import Pkg
             Pkg.develop(path=".")
             Pkg.instantiate()
@@ -55,7 +52,7 @@ jobs:
 
           # Setup FFTW environment
           echo "Setting up FFTW environment..."
-          julia --project=benchmark/fftw_env -e '
+          julia --color=yes --project=benchmark/fftw_env -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
@@ -63,7 +60,7 @@ jobs:
 
           # Setup plotting environment
           echo "Setting up plotting environment..."
-          julia --project=benchmark -e '
+          julia --color=yes --project=benchmark -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
