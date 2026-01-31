@@ -7,10 +7,10 @@ $(TYPEDEF)
 Node of a call graph
 
 # Arguments
-`left`: Offset to the left child node
-`right`: Offset to the right child node
-`type`: Object representing the type of FFT
-`sz`: Size of this FFT
+- `left`: Offset to the left child node
+- `right`: Offset to the right child node
+- `type`: Object representing the type of FFT
+- `sz`: Size of this FFT
 
 """
 struct CallGraphNode{T}
@@ -28,8 +28,8 @@ $(TYPEDEF)
 Object representing a graph of FFT Calls
 
 # Arguments
-`nodes`: Nodes keeping track of the graph
-`workspace`: Preallocated Workspace
+- `nodes`: Nodes keeping track of the graph
+- `workspace`: Preallocated Workspace
 
 """
 struct CallGraph{T<:Complex}
@@ -58,11 +58,11 @@ $(TYPEDSIGNATURES)
 Recursively instantiate a set of `CallGraphNode`s
 
 # Arguments
-`nodes`: A vector (which gets expanded) of `CallGraphNode`s
-`N`: The size of the FFT
-`workspace`: A vector (which gets expanded) of preallocated workspaces
-`s_in`: The stride of the input
-`s_out`: The stride of the output
+- `nodes`: A vector (which gets expanded) of `CallGraphNode`s
+- `N`: The size of the FFT
+- `workspace`: A vector (which gets expanded) of preallocated workspaces
+- `s_in`: The stride of the input
+- `s_out`: The stride of the output
 
 """
 function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vector{Vector{T}}, s_in::Int, s_out::Int)::Int where {T}
