@@ -1,3 +1,7 @@
+```@meta
+CurrentModule = FFTA
+```
+
 # Development Documentation
 
 Here is the documentation for key parts of the development side of the package.
