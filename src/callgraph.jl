@@ -3,7 +3,7 @@
 @enum FFTEnum COMPOSITE_FFT DFT POW3_FFT POW2RADIX4_FFT
 
 """
-$(TYPEDSIGNATURES)
+$(TYPEDEF)
 Node of a call graph
 
 # Arguments
@@ -24,7 +24,7 @@ struct CallGraphNode{T}
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TYPEDEF)
 Object representing a graph of FFT Calls
 
 # Arguments

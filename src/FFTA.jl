@@ -1,7 +1,7 @@
 module FFTA
 
 using AbstractFFTs: AbstractFFTs
-using DocStringExtensions: TYPEDSIGNATURES
+using DocStringExtensions: TYPEDEF, TYPEDSIGNATURES
 using LinearAlgebra: LinearAlgebra
 using MuladdMacro: @muladd
 using Primes: Primes
@@ -12,6 +12,4 @@ using Reexport: @reexport
 include("callgraph.jl")
 include("algos.jl")
 include("plan.jl")
-
-
 end
