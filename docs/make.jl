@@ -25,12 +25,13 @@ end
 
 makedocs(
     sitename = "FFTA",
+    modules = [FFTA],
     format = Documenter.HTML(),
     pages = [
+        "FFTA.jl" => "index.md",
         "Development Tools" => "dev.md",
         "Benchmarks" => "benchmarks.md"
     ],
-    modules = [FFTA]
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.
