@@ -43,7 +43,7 @@ jobs:
         run: |
           # Setup FFTA environment
           echo "Setting up FFTA environment..."
-          julia --project=benchmark/ffta_env -e '
+          julia --color=yes --project=benchmark/ffta_env -e '
             import Pkg
             Pkg.develop(path=".")
             Pkg.instantiate()
@@ -52,7 +52,7 @@ jobs:
 
           # Setup FFTW environment
           echo "Setting up FFTW environment..."
-          julia --project=benchmark/fftw_env -e '
+          julia --color=yes --project=benchmark/fftw_env -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
@@ -60,7 +60,7 @@ jobs:
 
           # Setup plotting environment
           echo "Setting up plotting environment..."
-          julia --project=benchmark -e '
+          julia --color=yes --project=benchmark -e '
             import Pkg
             Pkg.instantiate()
             Pkg.precompile()
