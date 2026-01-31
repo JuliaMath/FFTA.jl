@@ -12,7 +12,5 @@ CallGraph
 CallGraphNode!
 fft!
 fft_dft!
-fft_pow2!
 fft_pow3!
-fft_pow4!
 ```
