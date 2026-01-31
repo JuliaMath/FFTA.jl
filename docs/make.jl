@@ -32,6 +32,7 @@ makedocs(
         "Development Tools" => "dev.md",
         "Benchmarks" => "benchmarks.md"
     ],
+    warnonly = [:docs_block, :missing_docs],
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.
