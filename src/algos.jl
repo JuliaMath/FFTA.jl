@@ -34,13 +34,13 @@ $(TYPEDSIGNATURES)
 Cooley-Tukey composite FFT, with a pre-computed call graph
 
 # Arguments
-`out`: Output vector
-`in`: Input vector
-`start_out`: Index of the first element of the output vector
-`start_in`: Index of the first element of the input vector
-`d`: Direction of the transform
-`g`: Call graph for this transform
-`idx`: Index of the current transform in the call graph
+- `out`: Output vector
+- `in`: Input vector
+- `start_out`: Index of the first element of the output vector
+- `start_in`: Index of the first element of the input vector
+- `d`: Direction of the transform
+- `g`: Call graph for this transform
+- `idx`: Index of the current transform in the call graph
 
 """
 function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, g::CallGraph{T}, idx::Int) where {T,U}
@@ -78,14 +78,14 @@ $(TYPEDSIGNATURES)
 Discrete Fourier Transform, O(N^2) algorithm, in place.
 
 # Arguments
-`out`: Output vector
-`in`: Input vector
-`N`: Size of the transform
-`start_out`: Index of the first element of the output vector
-`stride_out`: Stride of the output vector
-`start_in`: Index of the first element of the input vector
-`stride_in`: Stride of the input vector
-`w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `out`: Output vector
+- `in`: Input vector
+- `N`: Size of the transform
+- `start_out`: Index of the first element of the output vector
+- `stride_out`: Stride of the output vector
+- `start_in`: Index of the first element of the input vector
+- `stride_in`: Stride of the input vector
+- `w`: The value `cispi(direction_sign(d) * 2 / N)`
 
 """
 function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T) where {T}
@@ -136,14 +136,14 @@ $(TYPEDSIGNATURES)
 Radix-4 FFT for powers of 2, in place
 
 # Arguments
-`out`: Output vector
-`in`: Input vector
-`N`: Size of the transform
-`start_out`: Index of the first element of the output vector
-`stride_out`: Stride of the output vector
-`start_in`: Index of the first element of the input vector
-`stride_in`: Stride of the input vector
-`w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `out`: Output vector
+- `in`: Input vector
+- `N`: Size of the transform
+- `start_out`: Index of the first element of the output vector
+- `stride_out`: Stride of the output vector
+- `start_in`: Index of the first element of the input vector
+- `stride_in`: Stride of the input vector
+- `w`: The value `cispi(direction_sign(d) * 2 / N)`
 
 """
 function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T) where {T, U}
@@ -216,16 +216,16 @@ $(TYPEDSIGNATURES)
 Power of 3 FFT, in place
 
 # Arguments
-out: Output vector
-in: Input vector
-N: Size of the transform
-start_out: Index of the first element of the output vector
-stride_out: Stride of the output vector
-start_in: Index of the first element of the input vector
-stride_in: Stride of the input vector
-w: The value `cispi(direction_sign(d) * 2 / N)`
-plus120: Depending on direction, perform either ±120° rotation
-minus120: Depending on direction, perform either ∓120° rotation
+- `out`: Output vector
+- `in`: Input vector
+- `N`: Size of the transform
+- `start_out`: Index of the first element of the output vector
+- `stride_out`: Stride of the output vector
+- `start_in`: Index of the first element of the input vector
+- `stride_in`: Stride of the input vector
+- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `plus120`: Depending on direction, perform either ±120° rotation
+- `minus120`: Depending on direction, perform either ∓120° rotation
 
 """
 function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, plus120::T, minus120::T) where {T, U}
