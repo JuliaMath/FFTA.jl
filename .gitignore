@@ -1,2 +1,4 @@
-/Manifest.toml
+Manifest.toml
+Manifest-v1*.toml
 docs/build
+settings.json
