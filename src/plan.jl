@@ -145,10 +145,8 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
     end
     Rpre = CartesianIndices(size(x)[1:p.region[]-1])
     Rpost = CartesianIndices(size(x)[p.region[]+1:end])
-    for Ipre in Rpre
-        for Ipost in Rpost
-            @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
-        end
+    for Ipost in Rpost, Ipre in Rpre
+        @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
     end
 end
 
@@ -186,17 +184,13 @@ function _mul_loop(
     rows::Int,
     cols::Int
 )
-    for I1 in R1
-        for I2 in R2
-            for I3 in R3
-                for k in 1:cols
-                    @views fft!(y_tmp[:,k],  x[I1,:,I2,k,I3], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
-                end
+    for I3 in R3, I2 in R2, I1 in R1
+        for k in 1:cols
+            @views fft!(y_tmp[:,k],  x[I1,:,I2,k,I3], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
+        end
 
-                for k in 1:rows
-                    @views fft!(y[I1,k,I2,:,I3], y_tmp[k,:], 1, 1, p.dir, p.callgraph[2][1].type, p.callgraph[2], 1)
-                end
-            end
+        for k in 1:rows
+            @views fft!(y[I1,k,I2,:,I3], y_tmp[k,:], 1, 1, p.dir, p.callgraph[2][1].type, p.callgraph[2], 1)
         end
     end
 end
