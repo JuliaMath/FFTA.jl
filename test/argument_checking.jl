@@ -61,7 +61,7 @@ end
     end
 end
 
-@testset "mismatch besteen input and output arrays" begin
+@testset "mismatch between input and output arrays" begin
     @testset "1D plan 1D array" begin
         x1 = complex(randn(3))
         y1 = similar(x1, length(x1) + 1)
