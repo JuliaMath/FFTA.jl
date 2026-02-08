@@ -54,78 +54,70 @@ Base.size(p::FFTAPlan{<:Any,N}) where N = ntuple(Base.Fix1(size, p), Val{N}())
 
 Base.complex(p::FFTAPlan_re{T,N,R}) where {T,N,R} = FFTAPlan_cx{T,N,R}(p.callgraph, p.region, p.dir, p.pinv)
 
-function AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region::R; kwargs...)::FFTAPlan_cx{T,<:Any,R} where {T<:Complex,N,R}
+AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Complex,N,R} =
+    _plan_fft(x, region, FFT_FORWARD; kwargs...)
+
+AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Complex,N,R} =
+    _plan_fft(x, region, FFT_BACKWARD; kwargs...)
+
+function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; kwargs...) where {T<:Complex,N,R}
     FFTN = length(region)
     if FFTN == 1
-        g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN,R}((g,), region, FFT_FORWARD, pinv)
+        R1 = Int(region[])
+        g = CallGraph{T}(size(x, R1))
+        pinv = FFTAInvPlan{T,1}()
+        return FFTAPlan_cx{T,1,Int}((g,), R1, dir, pinv)
     elseif FFTN == 2
         sort!(region)
-        g1 = CallGraph{T}(size(x,region[1]))
-        g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN,R}((g1,g2), region, FFT_FORWARD, pinv)
+        g1 = CallGraph{T}(size(x, region[1]))
+        g2 = CallGraph{T}(size(x, region[2]))
+        pinv = FFTAInvPlan{T,2}()
+        return FFTAPlan_cx{T,2,R}((g1, g2), region, dir, pinv)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
 end
 
-function AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region::R; kwargs...)::FFTAPlan_cx{T,<:Any,R} where {T<:Complex,N,R}
+function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Real,N,R}
     FFTN = length(region)
     if FFTN == 1
-        g = CallGraph{T}(size(x,region[]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN,R}((g,), region, FFT_BACKWARD, pinv)
-    elseif FFTN == 2
-        sort!(region)
-        g1 = CallGraph{T}(size(x,region[1]))
-        g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_cx{T,FFTN,R}((g1,g2), region, FFT_BACKWARD, pinv)
-    else
-        throw(ArgumentError("only supports 1D and 2D FFTs"))
-    end
-end
-
-function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; kwargs...)::FFTAPlan_re{Complex{T},<:Any,R} where {T <: Real,N,R}
-    FFTN = length(region)
-    if FFTN == 1
-        n = size(x, region[])
+        R1 = Int(region[])
+        n = size(x, R1)
         # For even length problems, we solve the real problem with
         # two n/2 complex FFTs followed by a butterfly. For odd size
         # problems, we just solve the problem as a single complex
         nn = iseven(n) ? n >> 1 : n
         g = CallGraph{Complex{T}}(nn)
-        pinv = FFTAInvPlan{Complex{T},FFTN}()
-        return FFTAPlan_re{Complex{T},FFTN,R}(tuple(g), region, FFT_FORWARD, pinv, n)
+        pinv = FFTAInvPlan{Complex{T},1}()
+        return FFTAPlan_re{Complex{T},1,Int}((g,), R1, FFT_FORWARD, pinv, n)
     elseif FFTN == 2
         sort!(region)
-        g1 = CallGraph{Complex{T}}(size(x,region[1]))
-        g2 = CallGraph{Complex{T}}(size(x,region[2]))
-        pinv = FFTAInvPlan{Complex{T},FFTN}()
-        return FFTAPlan_re{Complex{T},FFTN,R}(tuple(g1,g2), region, FFT_FORWARD, pinv, size(x,region[1]))
+        g1 = CallGraph{Complex{T}}(size(x, region[1]))
+        g2 = CallGraph{Complex{T}}(size(x, region[2]))
+        pinv = FFTAInvPlan{Complex{T},2}()
+        return FFTAPlan_re{Complex{T},2,R}((g1, g2), region, FFT_FORWARD, pinv, size(x, region[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; kwargs...)::FFTAPlan_re{T,<:Any,R} where {T,N,R}
+function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; kwargs...) where {T,N,R}
     FFTN = length(region)
     if FFTN == 1
         # For even length problems, we solve the real problem with
         # two n/2 complex FFTs followed by a butterfly. For odd size
         # problems, we just solve the problem as a single complex
+        R1 = Int(region[])
         nn = iseven(len) ? len >> 1 : len
         g = CallGraph{T}(nn)
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_re{T,FFTN,R}((g,), region, FFT_BACKWARD, pinv, len)
+        pinv = FFTAInvPlan{T,1}()
+        return FFTAPlan_re{T,1,Int}((g,), R1, FFT_BACKWARD, pinv, len)
     elseif FFTN == 2
         sort!(region)
         g1 = CallGraph{T}(len)
-        g2 = CallGraph{T}(size(x,region[2]))
-        pinv = FFTAInvPlan{T,FFTN}()
-        return FFTAPlan_re{T,FFTN,R}((g1,g2), region, FFT_BACKWARD, pinv, len)
+        g2 = CallGraph{T}(size(x, region[2]))
+        pinv = FFTAInvPlan{T,2}()
+        return FFTAPlan_re{T,2,R}((g1, g2), region, FFT_BACKWARD, pinv, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -388,13 +380,13 @@ function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,N}) where {T<:
 end
 
 ##### Backward
-function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex, N}
+function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex,N}
     Base.require_one_based_indexing(x)
     if size(p, 1) ÷ 2 + 1 != size(x, p.region[1])
         throw(DimensionMismatch("real 2D plan has size $(size(p)). First transform dimension of input array should have size ($(size(p, 1) ÷ 2 + 1)), but has size $(size(x, p.region[1]))"))
     end
     if p.dir === FFT_BACKWARD
-        res_size = ntuple(i->ifelse(i==p.region[1], p.flen, size(x,i)), ndims(x))
+        res_size = ntuple(i -> ifelse(i == p.region[1], p.flen, size(x, i)), Val(N))
         # for the inverse transformation we have to reconstruct the full array
         half_1 = 1:(p.flen ÷ 2 + 1)
         half_2 = half_1[end]+1:p.flen
