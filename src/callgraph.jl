@@ -46,11 +46,11 @@ Check if `N` is a power of 2 or 4
 
 """
 function _ispow24(N::Int)
-    N < 1 && return nothing
-    while N & 0b11 == 0
-        N >>= 2
+    if ispow2(N)
+        zero_cnt = trailing_zeros(N)
+        return iseven(zero_cnt) ? POW4 : POW2
     end
-    return N < 3 ? Pow24(N) : nothing
+    return nothing
 end
 
 """
@@ -66,10 +66,10 @@ Recursively instantiate a set of `CallGraphNode`s
 
 """
 function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vector{Vector{T}}, s_in::Int, s_out::Int)::Int where {T}
-    if N == 0
-        throw(DimensionMismatch("array has to be non-empty"))
+    if N <= 0
+        throw(DimensionMismatch("Array length must be strictly positive"))
     end
-    w = cispi(T(2)/N)
+    w = cispi(T(2) / N)
     if iseven(N)
         pow = _ispow24(N)
         if !isnothing(pow)
@@ -77,15 +77,11 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
             push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out, w))
             return 1
         end
-    end
-    if N % 3 == 0
-        if nextpow(3, N) == N
-            push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out, w))
-            return 1
-        end
-    end
-    if N == 1 || Primes.isprime(N)
+    elseif N % 3 == 0 && nextpow(3, N) == N
+        push!(workspace, T[])
+        push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out, w))
+        return 1
+    elseif N == 1 || Primes.isprime(N)
         push!(workspace, T[])
         push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
         return 1
@@ -107,8 +103,8 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
     push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
     sz = length(nodes)
     push!(workspace, Vector{T}(undef, N))
-    left_len = CallGraphNode!(nodes, N1, workspace, N2, N2*s_out)
-    right_len = CallGraphNode!(nodes, N2, workspace, N1*s_in, 1)
+    left_len  = CallGraphNode!(nodes, N1, workspace, N2       , N2 * s_out)
+    right_len = CallGraphNode!(nodes, N2, workspace, N1 * s_in,          1)
     nodes[sz] = CallGraphNode(1, 1 + left_len, COMPOSITE_FFT, N, s_in, s_out, w)
     return 1 + left_len + right_len
 end
