@@ -155,7 +155,7 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     end
 
     # If N is 4, compute an unrolled radix-2 FFT and return
-    minusi = -sign(imag(w))*im
+    minusi = -sign(imag(w)) * im
     @inbounds if N == 4
         xee = in[start_in]
         xoe = in[start_in +   stride_in]
@@ -164,7 +164,7 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
         xee_p_xeo = xee + xeo
         xee_m_xeo = xee - xeo
         xoe_p_xoo = xoe + xoo
-        xoe_m_xoo = -(xoe - xoo)*minusi
+        xoe_m_xoo = -(xoe - xoo) * minusi
         out[start_out]                = xee_p_xeo + xoe_p_xoo
         out[start_out +   stride_out] = xee_m_xeo + xoe_m_xoo
         out[start_out + 2*stride_out] = xee_p_xeo - xoe_p_xoo
@@ -176,9 +176,9 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     m = N ÷ 4
 
     w1 = w
-    w2 = w*w1
-    w3 = w*w2
-    w4 = w*w3
+    w2 = w * w1
+    w3 = w * w2
+    w4 = w * w3
 
     fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, w4)
     fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, w4)
@@ -193,9 +193,9 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
         keo = start_out + (k + 2 * m) * stride_out
         koo = start_out + (k + 3 * m) * stride_out
         y_kee, y_koe, y_keo, y_koo = out[kee], out[koe], out[keo], out[koo]
-        ỹ_keo = y_keo*wkeo
-        ỹ_koe = y_koe*wkoe
-        ỹ_koo = y_koo*wkoo
+        ỹ_keo = y_keo * wkeo
+        ỹ_koe = y_koe * wkoe
+        ỹ_koo = y_koo * wkoo
         y_kee_p_y_keo = y_kee + ỹ_keo
         y_kee_m_y_keo = y_kee - ỹ_keo
         ỹ_koe_p_ỹ_koo = ỹ_koe + ỹ_koo
@@ -245,16 +245,16 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w^3, plus120, minus120)
 
     w1 = w
-    w2 = w*w1
+    w2 = w * w1
     wk1 = wk2 = one(T)
     for k in 0:Nprime-1
-        @muladd k0 = start_out + k*stride_out
-        @muladd k1 = start_out + (k+Nprime)*stride_out
-        @muladd k2 = start_out + (k+2*Nprime)*stride_out
+        @muladd k0 = start_out + stride_out * k
+        @muladd k1 = start_out + stride_out * (k + Nprime)
+        @muladd k2 = start_out + stride_out * (k + 2 * Nprime)
         y_k0, y_k1, y_k2 = out[k0], out[k1], out[k2]
-        @muladd out[k0] = y_k0 + y_k1*wk1 + y_k2*wk2
-        @muladd out[k1] = y_k0 + y_k1*wk1*plus120 + y_k2*wk2*minus120
-        @muladd out[k2] = y_k0 + y_k1*wk1*minus120 + y_k2*wk2*plus120
+        @muladd out[k0] = y_k0 + y_k1 * wk1            + y_k2 * wk2
+        @muladd out[k1] = y_k0 + y_k1 * wk1 * plus120  + y_k2 * wk2 * minus120
+        @muladd out[k2] = y_k0 + y_k1 * wk1 * minus120 + y_k2 * wk2 * plus120
         wk1 *= w1
         wk2 *= w2
     end
