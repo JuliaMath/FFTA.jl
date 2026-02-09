@@ -86,18 +86,21 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
         return 1
     end
-    Ns = [first(x) for x in collect(Primes.factor(N)) for _ in 1:last(x)]
-    if Ns[1] == 2
-        N1 = prod(Ns[Ns .== 2])
-    elseif Ns[1] == 3
-        N1 = prod(Ns[Ns .== 3])
+    fzn = Primes.factor(N)
+    Nf1, Nf1_cnt = first(fzn)
+    if Nf1 == 2 || Nf1 == 3
+        N1 = Nf1^Nf1_cnt
     else
+        Ns = [first(x) for x in fzn for _ in 1:last(x)]
         # Greedy search for closest factor of N to sqrt(N)
-        Nsqrt = sqrt(N)
-        N_cp = cumprod(Ns[end:-1:1])[end:-1:1]
-        N_prox = abs.(N_cp .- Nsqrt)
-        _,N1_idx = findmin(N_prox)
-        N1 = N_cp[N1_idx]
+        N_fsqrt =  sqrt(N)
+        N_isqrt = isqrt(N)
+        N_cp = cumprod(Ns)      # reverse(Ns) another choice
+        N1_idx = searchsortedlast(N_cp, N_isqrt)
+        N1 = N_cp[N1_idx]       # N1 <= N_isqrt <= N_fsqrt
+        if N1_idx != lastindex(N_cp) && (abs(N_cp[N1_idx+1] - N_fsqrt) < (N_fsqrt - N1))
+            N1 = N_cp[N1_idx+1] # can be >= N_fsqrt
+        end
     end
     N2 = N ÷ N1
     push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
