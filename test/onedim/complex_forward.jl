@@ -11,7 +11,7 @@ using FFTA, Test
 end
 
 @testset "1D plan, 1D array. Size: $n" for n in 1:64
-    x = complex.(randn(n), randn(n))
+    x = randn(ComplexF64, n)
 
     @testset "against naive implementation" begin
         @test naive_1d_fourier_transform(x, FFTA.FFT_FORWARD) ≈ fft(x)
@@ -23,7 +23,7 @@ end
 end
 
 @testset "1D plan, ND array. Size: $n" for n in 1:64
-    x = complex.(randn(n, n + 1, n + 2), randn(n, n + 1, n + 2))
+    x = randn(ComplexF64, n, n + 1, n + 2)
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
         @test fft(x, r) == mapslices(fft, x; dims = r)

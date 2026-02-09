@@ -1,8 +1,9 @@
 using Test, Random, FFTA
 
 macro test_allocations(args)
-    if Base.VERSION >= v"1.9"
-        :(@allocations($(esc(args))))
+    @static if Base.VERSION >= v"1.9"
+        ex = Expr(:macrocall, Symbol("@allocations"), __source__, args)
+        return esc(ex)
     else
         :(0)
     end
