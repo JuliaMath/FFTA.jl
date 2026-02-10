@@ -1,13 +1,14 @@
 using FFTA, Test
 
-@testset verbose = true " forward. N=$N" for N in [8, 11, 15, 16, 27, 100]
+# N = 275 to exercise `N1 = N_cp[N1_idx+1]` code path in CallGraphNode!
+@testset verbose = true " forward. N=$N" for N in [8, 11, 15, 16, 27, 100, 275]
     x = ones(ComplexF64, N)
     y = fft(x)
-    y_ref = 0*y
+    y_ref = 0 * y
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
-    @test y == fft(reshape(x,1,1,N),3)[1,1,:]
-    @test y == fft(reshape(x,N,1), 1)[:,1]
+    @test y == fft(reshape(x, 1, 1, N), 3)[:]
+    @test y == fft(reshape(x, N, 1),    1)[:]
 end
 
 @testset "1D plan, 1D array. Size: $n" for n in 1:64
