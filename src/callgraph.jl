@@ -1,6 +1,6 @@
 @enum Direction FFT_FORWARD=-1 FFT_BACKWARD=1
 @enum Pow24 POW2=2 POW4=1
-@enum FFTEnum COMPOSITE_FFT DFT POW3_FFT POW2RADIX4_FFT
+@enum FFTEnum COMPOSITE_FFT DFT POW3_FFT POW2RADIX4_FFT BLUESTEIN
 
 """
 $(TYPEDEF)
@@ -83,7 +83,9 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         return 1
     elseif N == 1 || Primes.isprime(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
+        # use Bluestein's algorithm for big primes
+        LEAF_ALG = N < 100 ? DFT : BLUESTEIN
+        push!(nodes, CallGraphNode(0, 0, LEAF_ALG, N, s_in, s_out, w))
         return 1
     end
     fzn = Primes.factor(N)

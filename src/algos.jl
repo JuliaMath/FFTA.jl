@@ -21,6 +21,8 @@ function fft!(out::AbstractVector{T}, in::AbstractVector{T}, start_out::Int, sta
                 m_120 = cispi(T(4)/3)
                 _p_120, _m_120 = d == FFT_FORWARD ? (p_120, m_120) : (m_120, p_120)
                 fft_pow3!(out, in, root.sz, start_out, s_out, start_in, s_in, _conj(root.w, d), _m_120, _p_120)
+            elseif t === BLUESTEIN
+                fft_bluestein!(out, in, d, root.sz, start_out, s_out, start_in, s_in)
             else
                 throw(ArgumentError("kernel not implemented"))
             end
@@ -258,4 +260,74 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
         wk1 *= w1
         wk2 *= w2
     end
+end
+
+
+"""
+$(TYPEDSIGNATURES)
+Bluestein's algorithm, still O(N * log(N)) for large primes,
+but with a big constant factor.
+Zero-pads two sequences derived from the DFT formula to a
+power of 2 length greater than `2N-1` and computes their convolution
+with a power 2 FFT.
+
+# Arguments
+- `out`: Output vector
+- `in`: Input vector
+- `d`: Direction of the transform
+- `N`: Size of the transform
+- `start_out`: Index of the first element of the output vector
+- `stride_out`: Stride of the output vector
+- `start_in`: Index of the first element of the input vector
+- `stride_in`: Stride of the input vector
+- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+
+"""
+function fft_bluestein!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    d::Direction,
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int
+) where T<:Number
+
+    in_inds = range(start_in; step=stride_in, length=N)
+    pad_len = nextpow(2, 2N - 1)
+
+    a_series = Vector{T}(undef, pad_len)
+    b_series = Vector{T}(undef, pad_len)
+    tmp = Vector{T}(undef, pad_len)
+
+    a_series[N+1:end] .= zero(T)
+    b_series[N+1:end] .= zero(T)
+    tmp[N+1:end]      .= zero(T)
+
+    sgn = -direction_sign(d)
+    @. b_series[1:N] = cispi(sgn * (0:N-1)^2 / N)
+    @. a_series[1:N] = in[in_inds] * conj(b_series[1:N])
+    # enforce periodic boundaries for b_n
+    for j in 0:N-1
+        b_series[pad_len-j] = b_series[2+j]
+    end
+
+    w_pad = cispi(T(2) / pad_len)
+    # leave b_n vector alone for last step
+    fft_pow2_radix4!(tmp,      a_series, pad_len, 1, 1, 1, 1, w_pad)    # Fa
+    fft_pow2_radix4!(a_series, b_series, pad_len, 1, 1, 1, 1, w_pad)    # Fb
+
+    tmp .*= a_series
+    # convolution theorem ifft
+    fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, conj(w_pad))
+    conv_a_b = a_series
+
+    keepat!(conv_a_b, 1:N)
+    conv_a_b ./= pad_len
+    keepat!(b_series, 1:N)
+    keepat!(tmp, 1:N)
+
+    Xk = (@. tmp = conj(b_series) * conv_a_b)
+
+    out_inds = range(start_out; step=stride_out, length=N)
+    out[out_inds] = Xk
+    return nothing
 end
