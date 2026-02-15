@@ -1,5 +1,5 @@
 @enum Direction FFT_FORWARD=-1 FFT_BACKWARD=1
-@enum Pow24 POW2=2 POW4=1
+@enum Pow24 POW2 POW4
 @enum FFTEnum COMPOSITE_FFT DFT POW3_FFT POW2RADIX4_FFT BLUESTEIN
 
 """
@@ -70,13 +70,11 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         throw(DimensionMismatch("Array length must be strictly positive"))
     end
     w = cispi(T(2) / N)
-    if iseven(N)
-        pow = _ispow24(N)
-        if !isnothing(pow)
-            push!(workspace, T[])
-            push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out, w))
-            return 1
-        end
+    if iseven(N) && ispow2(N)
+        # _ispow24(N)
+        push!(workspace, T[])
+        push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out, w))
+        return 1
     elseif N % 3 == 0 && nextpow(3, N) == N
         push!(workspace, T[])
         push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out, w))
@@ -100,7 +98,7 @@ function CallGraphNode!(nodes::Vector{CallGraphNode{T}}, N::Int, workspace::Vect
         N_cp = cumprod(Ns)      # reverse(Ns) another choice
         N1_idx = searchsortedlast(N_cp, N_isqrt)
         N1 = N_cp[N1_idx]       # N1 <= N_isqrt <= N_fsqrt
-        if N1_idx != lastindex(N_cp) && (abs(N_cp[N1_idx+1] - N_fsqrt) < (N_fsqrt - N1))
+        if N1_idx != lastindex(N_cp) && (N_cp[N1_idx+1] - N_fsqrt < (N_fsqrt - N1))
             N1 = N_cp[N1_idx+1] # can be >= N_fsqrt
         end
     end
