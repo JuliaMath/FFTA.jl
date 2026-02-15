@@ -136,6 +136,7 @@ function LinearAlgebra.mul!(y::AbstractVector{U}, p::FFTAPlan_cx{T,1}, x::Abstra
         throw(DimensionMismatch("plan has axes $(size(p)), but input array has axes $(size(x))"))
     end
     fft!(y, x, 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
+    return y
 end
 
 #### 1D plan ND array
@@ -150,6 +151,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
     Rpre = CartesianIndices(size(x)[1:p.region[]-1])
     Rpost = CartesianIndices(size(x)[p.region[]+1:end])
     _mul_loop!(y, x, Rpre, Rpost, p)
+    return y
 end
 
 function _mul_loop!(
@@ -184,6 +186,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,2}, x::Abstr
     # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
     # it might be a bit tricky to construct the Rxs in an inferred way.
     _mul_loop!(y_tmp, y, x, p, R1, R2, R3, rows, cols)
+    return y
 end
 
 function _mul_loop!(
