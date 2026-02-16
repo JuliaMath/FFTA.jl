@@ -291,12 +291,11 @@ function fft_bluestein!(
     start_in::Int, stride_in::Int
 ) where T<:Number
 
-    in_inds = range(start_in; step=stride_in, length=N)
     pad_len = nextpow(2, 2N - 1)
 
     a_series = Vector{T}(undef, pad_len)
     b_series = Vector{T}(undef, pad_len)
-    tmp = Vector{T}(undef, pad_len)
+    tmp      = Vector{T}(undef, pad_len)
 
     a_series[N+1:end] .= zero(T)
     b_series[N+1:end] .= zero(T)
@@ -304,7 +303,9 @@ function fft_bluestein!(
 
     sgn = -direction_sign(d)
     @. b_series[1:N] = cispi(sgn * (0:N-1)^2 / N)
-    @. a_series[1:N] = in[in_inds] * conj(b_series[1:N])
+    for i in 1:N
+        a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
+    end
     # enforce periodic boundaries for b_n
     for j in 0:N-1
         b_series[pad_len-j] = b_series[2+j]
@@ -320,14 +321,12 @@ function fft_bluestein!(
     fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, conj(w_pad))
     conv_a_b = a_series
 
-    keepat!(conv_a_b, 1:N)
-    conv_a_b ./= pad_len
-    keepat!(b_series, 1:N)
-    keepat!(tmp, 1:N)
-
-    Xk = (@. tmp = conj(b_series) * conv_a_b)
+    Xk = tmp
+    for i in 1:N
+        Xk[i] = conj(b_series[i]) * conv_a_b[i] / pad_len
+    end
 
     out_inds = range(start_out; step=stride_out, length=N)
-    out[out_inds] = Xk
+    copyto!(out, CartesianIndices((out_inds,)), Xk, CartesianIndices((N,)))
     return nothing
 end
