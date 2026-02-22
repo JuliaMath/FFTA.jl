@@ -167,25 +167,22 @@ end
 
 #### 2D plan ND array
 function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,2}, x::AbstractArray{T,N}) where {T,U,N}
-    Base.require_one_based_indexing(x)
+    Base.require_one_based_indexing(y, x)
     if axes(x) != axes(y)
         throw(DimensionMismatch("input array has axes $(axes(x)), but output array has axes $(axes(y))"))
-    end
-    if N < 2
+    elseif N < 2
         throw(DimensionMismatch("array dimension $N cannot be smaller than the plan size 2"))
-    end
-    if size(p) != (size(x, p.region[1]), size(x, p.region[2]))
+    elseif size(p) != (size(x, p.region[1]), size(x, p.region[2]))
         throw(DimensionMismatch("plan has size $(size(p)), but input array has size $((size(x, p.region[1]), size(x, p.region[2]))) along regions $(p.region)"))
     end
-    R1 = CartesianIndices(size(x)[1:p.region[1]-1])
-    R2 = CartesianIndices(size(x)[p.region[1]+1:p.region[2]-1])
-    R3 = CartesianIndices(size(x)[p.region[2]+1:end])
+    Rpre  = CartesianIndices(size(x)[1:p.region[1]-1])
+    Rpost = CartesianIndices(size(x)[p.region[2]+1:end])
     y_tmp = similar(y, axes(y)[p.region])
     rows, cols = size(x)[p.region]
     # Introduce function barrier here since the variables used in the loop ranges aren't inferred. This
     # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
     # it might be a bit tricky to construct the Rxs in an inferred way.
-    _mul_loop!(y_tmp, y, x, p, R1, R2, R3, rows, cols)
+    _mul_loop!(y_tmp, y, x, p, Rpre, Rpost, rows, cols)
     return y
 end
 
@@ -194,19 +191,23 @@ function _mul_loop!(
     y::AbstractArray,
     x::AbstractArray,
     p::FFTAPlan,
-    R1::CartesianIndices,
-    R2::CartesianIndices,
-    R3::CartesianIndices,
+    Rpre::CartesianIndices,
+    Rpost::CartesianIndices,
     rows::Int,
     cols::Int
 )
-    for I3 in R3, I2 in R2, I1 in R1
+    cg1 = p.callgraph[1]
+    cg2 = p.callgraph[2]
+    t1 = cg1[1].type
+    t2 = cg2[1].type
+
+    for Ipost in Rpost, Ipre in Rpre
         for k in 1:cols
-            @views fft!(y_tmp[:,k], x[I1,:,I2,k,I3], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
+            @views fft!(y_tmp[:,k], x[Ipre,:,k,Ipost], 1, 1, p.dir, t1, cg1, 1)
         end
 
         for k in 1:rows
-            @views fft!(y[I1,k,I2,:,I3], y_tmp[k,:], 1, 1, p.dir, p.callgraph[2][1].type, p.callgraph[2], 1)
+            @views fft!(y[Ipre,k,:,Ipost], y_tmp[k,:], 1, 1, p.dir, t2, cg2, 1)
         end
     end
 end
