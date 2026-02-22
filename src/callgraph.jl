@@ -50,13 +50,13 @@ $(TYPEDSIGNATURES)
 Check if `N` is a power of 2 or 4
 
 """
-function _ispow24(N::Int)
-    if ispow2(N)
-        zero_cnt = trailing_zeros(N)
-        return iseven(zero_cnt) ? POW4 : POW2
-    end
-    return nothing
-end
+# function _ispow24(N::Int)
+#     if ispow2(N)
+#         zero_cnt = trailing_zeros(N)
+#         return iseven(zero_cnt) ? POW4 : POW2
+#     end
+#     return nothing
+# end
 
 """
 $(TYPEDSIGNATURES)
