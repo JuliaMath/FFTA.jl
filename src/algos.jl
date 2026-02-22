@@ -70,6 +70,9 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     wj1 = one(T)
     tmp = g.workspace[idx]
 
+    if Rt === BLUESTEIN
+        R_scratch = prealloc_blue(N2, d, T)
+    end
     for j1 in 0:N1-1
         wk2 = wj1
         R_start_in  = start_in + j1 * s_in
@@ -78,7 +81,7 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
         if Rt === BLUESTEIN
             R_s_in  = right.s_in
             R_s_out = right.s_out
-            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in)
+            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_scratch)
         else
             fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
         end
@@ -93,13 +96,16 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
         wj1 *= w1
     end
 
+    if Lt === BLUESTEIN
+        L_scratch = prealloc_blue(N1, d, T)
+    end
     for k2 in 0:N2-1
         L_start_out = start_out + k2 * s_out
         L_start_in  = 1 + k2
         if Lt === BLUESTEIN
             L_s_in  = left.s_in
             L_s_out = left.s_out
-            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in)
+            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_scratch)
         else
             fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
         end
@@ -295,20 +301,26 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
 end
 
 
-function compute_bchirp(N::Int, d::Direction, ::Type{T}) where T
+function prealloc_blue(N::Int, d::Direction, ::Type{T}) where T<:Number
     pad_len = nextpow(2, 2N - 1)
 
     b_series = Vector{T}(undef, pad_len)
+    a_series = Vector{T}(undef, pad_len)
+    tmp      = Vector{T}(undef, pad_len)
+
     b_series[N+1:end] .= zero(T)
 
     sgn = -direction_sign(d)
-    @. b_series[1:N] = cispi(sgn * mod((0:N-1)^2, (-N+1:N,)) / N)
+    for i in 1:N
+        b_series[i] = cispi(sgn * mod((i - 1)^2, -N+1:N) / N)
+    end
 
     # enforce periodic boundaries for b_n
     for j in 0:N-1
         b_series[pad_len-j] = b_series[2+j]
     end
-    return b_series, pad_len
+
+    return (tmp, a_series, b_series, pad_len)
 end
 
 """
@@ -336,12 +348,11 @@ function fft_bluestein!(
     d::Direction,
     N::Int,
     start_out::Int, stride_out::Int,
-    start_in::Int, stride_in::Int
+    start_in::Int,  stride_in::Int,
+    scratch::Tuple{Vector{T},Vector{T},Vector{T},Int}=prealloc_blue(N, d, T)
 ) where T<:Number
 
-    b_series, pad_len = compute_bchirp(N, d, T)
-    a_series = Vector{T}(undef, pad_len)
-    tmp      = Vector{T}(undef, pad_len)
+    (tmp, a_series, b_series, pad_len) = scratch
 
     a_series[N+1:end] .= zero(T)
     tmp[N+1:end]      .= zero(T)
