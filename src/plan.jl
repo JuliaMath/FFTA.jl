@@ -74,7 +74,11 @@ function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_C
         pinv = FFTAInvPlan{T,2}()
         return FFTAPlan_cx{T,2,R}((g1, g2), region, dir, pinv)
     else
-        throw(ArgumentError("only supports 1D and 2D FFTs"))
+        sort!(region)
+        return FFTAPlan_cx{T,FFTN,R}(
+            ntuple(i -> CallGraph{T}(size(x, region[i])), Val(FFTN)),
+            region, dir, FFTAInvPlan{T,FFTN}()
+        )
     end
 end
 
@@ -165,52 +169,111 @@ function _mul_loop!(
     end
 end
 
-#### 2D plan ND array
-function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,2}, x::AbstractArray{T,N}) where {T,U,N}
-    Base.require_one_based_indexing(y, x)
-    if axes(x) != axes(y)
-        throw(DimensionMismatch("input array has axes $(axes(x)), but output array has axes $(axes(y))"))
-    elseif N < 2
-        throw(DimensionMismatch("array dimension $N cannot be smaller than the plan size 2"))
-    elseif size(p) != (size(x, p.region[1]), size(x, p.region[2]))
-        throw(DimensionMismatch("plan has size $(size(p)), but input array has size $((size(x, p.region[1]), size(x, p.region[2]))) along regions $(p.region)"))
+#### ND plan ND array
+@generated function LinearAlgebra.mul!(
+    out::AbstractArray{U,N},
+    p::FFTAPlan_cx{T,N},
+    X::AbstractArray{T,N}
+) where {T,U,N}
+
+    quote
+        Base.require_one_based_indexing(out, X)
+        if size(out) != size(X)
+            throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
+        elseif size(p) != size(X)
+            throw(DimensionMismatch("plan has size $(size(p)), but input array has size $(size(X))"))
+        elseif !(p.region == N || p.region == 1:N)
+            throw(DimensionMismatch("Plan region is outside array dimensions."))
+        end
+
+        sz = size(X)
+        max_sz = maximum(sz)
+        obuf = Vector{T}(undef, max_sz)
+        ibuf = Vector{T}(undef, max_sz)
+        sizehint!(obuf, max_sz) # not guaranteed but hopefully prevents allocations
+        sizehint!(ibuf, max_sz)
+        dir = p.dir
+
+        copyto!(out, X) # operate in-place on output array
+
+        Base.Cartesian.@nexprs $N dim -> begin
+            n = size(out, dim)
+            resize!(obuf, n)
+            resize!(ibuf, n)
+            cg = p.callgraph[dim]
+
+            Rpre_{dim}  = CartesianIndices(sz[1:dim-1])
+            Rpost_{dim} = CartesianIndices(sz[dim+1:N])
+
+            fft_along_dim!(out, ibuf, obuf, cg, dir, Rpre_{dim}, Rpost_{dim})
+        end
+
+        return out
     end
-    Rpre  = CartesianIndices(size(x)[1:p.region[1]-1])
-    Rpost = CartesianIndices(size(x)[p.region[2]+1:end])
-    y_tmp = similar(y, axes(y)[p.region])
-    rows, cols = size(x)[p.region]
-    # Introduce function barrier here since the variables used in the loop ranges aren't inferred. This
-    # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
-    # it might be a bit tricky to construct the Rxs in an inferred way.
-    _mul_loop!(y_tmp, y, x, p, Rpre, Rpost, rows, cols)
-    return y
 end
 
-function _mul_loop!(
-    y_tmp::AbstractArray,
-    y::AbstractArray,
-    x::AbstractArray,
-    p::FFTAPlan,
-    Rpre::CartesianIndices,
-    Rpost::CartesianIndices,
-    rows::Int,
-    cols::Int
-)
-    cg1 = p.callgraph[1]
-    cg2 = p.callgraph[2]
-    t1 = cg1[1].type
-    t2 = cg2[1].type
+#### MD plan ND array (M<N)
+function LinearAlgebra.mul!(
+    out::AbstractArray{U,N},
+    p::FFTAPlan_cx{T,M},
+    X::AbstractArray{T,N}
+) where {T,U,N,M}
+    Base.require_one_based_indexing(out, X)
+    if size(out) != size(X)
+        throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
+    elseif M > N || p.region[1] < 1 || p.region[end] > N
+        throw(DimensionMismatch("Plan region is outside array dimensions."))
+    end
+
+    sz = size(X)
+    max_sz = maximum(Base.Fix1(size, out), p.region)
+    obuf = Vector{T}(undef, max_sz)
+    ibuf = Vector{T}(undef, max_sz)
+    sizehint!(obuf, max_sz) # not guaranteed but hopefully prevents allocations
+    sizehint!(ibuf, max_sz)
+    dir = p.dir
+
+    copyto!(out, X) # operate in-place on output array
+
+    # don't use generated functions because this cannot be type-stable anyway
+    for dim in 1:M
+        pdim = p.region[dim]
+        n = size(out, pdim)
+        resize!(obuf, n)
+        resize!(ibuf, n)
+        cg = p.callgraph[dim]
+
+        Rpre  = CartesianIndices(sz[1:pdim-1])
+        Rpost = CartesianIndices(sz[pdim+1:N])
+
+        fft_along_dim!(out, ibuf, obuf, cg, dir, Rpre, Rpost)
+    end
+
+    return out
+end
+
+function fft_along_dim!(
+    A::AbstractArray,
+    ibuf::Vector{T}, obuf::Vector{T},
+    cg::CallGraph{T}, d::Direction,
+    Rpre::CartesianIndices{M}, Rpost::CartesianIndices
+) where {T <: Complex{<:AbstractFloat}, M}
+
+    t = cg[1].type
+    dim = M + 1
+    cols = eachindex(axes(A, dim), ibuf, obuf)
 
     for Ipost in Rpost, Ipre in Rpre
-        for k in 1:cols
-            @views fft!(y_tmp[:,k], x[Ipre,:,k,Ipost], 1, 1, p.dir, t1, cg1, 1)
+        for j in cols
+            ibuf[j] = A[Ipre, j, Ipost]
         end
-
-        for k in 1:rows
-            @views fft!(y[Ipre,k,:,Ipost], y_tmp[k,:], 1, 1, p.dir, t2, cg2, 1)
+        fft!(obuf, ibuf, 1, 1, d, t, cg, 1)
+        for j in cols
+            A[Ipre, j, Ipost] = obuf[j]
         end
     end
 end
+
 
 ## *
 ### Complex
