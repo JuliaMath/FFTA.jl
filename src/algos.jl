@@ -4,28 +4,34 @@ end
 
 @inline _conj(w::Complex, d::Direction) = ifelse(direction_sign(d) === 1, w, conj(w))
 
-function fft!(out::AbstractVector{T}, in::AbstractVector{T}, start_out::Int, start_in::Int, d::Direction, t::FFTEnum, g::CallGraph{T}, idx::Int) where T
+function fft!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    start_out::Int, start_in::Int,
+    d::Direction,
+    t::FFTEnum,
+    g::CallGraph{T},
+    idx::Int
+    ) where T
     if t === COMPOSITE_FFT
         fft_composite!(out, in, start_out, start_in, d, g, idx)
     else
         root = g[idx]
-        if t == DFT
-            fft_dft!(out, in, root.sz, start_out, root.s_out, start_in, root.s_in, _conj(root.w, d))
+        s_in = root.s_in
+        s_out = root.s_out
+        N = root.sz
+        w = _conj(root.w, d)
+        if t === DFT
+            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, w)
+        elseif t === POW2RADIX4_FFT
+            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, w)
+        elseif t === POW3_FFT
+            _m_120 = cispi(T(2) / 3)
+            m_120 = d === FFT_FORWARD ? _m_120 : conj(_m_120)
+            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, w, m_120)
+        elseif t === BLUESTEIN
+            fft_bluestein!(out, in, d, N, start_out, s_out, start_in, s_in)
         else
-            s_in = root.s_in
-            s_out = root.s_out
-            if t === POW2RADIX4_FFT
-                fft_pow2_radix4!(out, in, root.sz, start_out, s_out, start_in, s_in, _conj(root.w, d))
-            elseif t === POW3_FFT
-                p_120 = cispi(T(2)/3)
-                m_120 = cispi(T(4)/3)
-                _p_120, _m_120 = d == FFT_FORWARD ? (p_120, m_120) : (m_120, p_120)
-                fft_pow3!(out, in, root.sz, start_out, s_out, start_in, s_in, _conj(root.w, d), _m_120, _p_120)
-            elseif t === BLUESTEIN
-                fft_bluestein!(out, in, d, root.sz, start_out, s_out, start_in, s_in)
-            else
-                throw(ArgumentError("kernel not implemented"))
-            end
+            throw(ArgumentError("kernel not implemented"))
         end
     end
 end
@@ -230,7 +236,8 @@ Power of 3 FFT, in place
 - `minus120`: Depending on direction, perform either ∓120° rotation
 
 """
-function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, plus120::T, minus120::T) where {T, U}
+function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, minus120::T) where {T, U}
+    plus120 = conj(minus120)
     if N == 3
         @muladd out[start_out + 0]            = in[start_in] + in[start_in + stride_in]          + in[start_in + 2*stride_in]
         @muladd out[start_out +   stride_out] = in[start_in] + in[start_in + stride_in]*plus120  + in[start_in + 2*stride_in]*minus120
@@ -242,17 +249,17 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     Nprime = N ÷ 3
 
     # Dividing into subproblems
-    fft_pow3!(out, in, Nprime, start_out, stride_out, start_in, stride_in*3, w^3, plus120, minus120)
-    fft_pow3!(out, in, Nprime, start_out + Nprime*stride_out, stride_out, start_in + stride_in, stride_in*3, w^3, plus120, minus120)
-    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w^3, plus120, minus120)
+    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, w^3, minus120)
+    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, w^3, minus120)
+    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w^3, minus120)
 
     w1 = w
     w2 = w * w1
     wk1 = wk2 = one(T)
     for k in 0:Nprime-1
-        @muladd k0 = start_out + stride_out * k
-        @muladd k1 = start_out + stride_out * (k + Nprime)
-        @muladd k2 = start_out + stride_out * (k + 2 * Nprime)
+        k0 = start_out + stride_out * k
+        k1 = start_out + stride_out * (k + Nprime)
+        k2 = start_out + stride_out * (k + 2 * Nprime)
         y_k0, y_k1, y_k2 = out[k0], out[k1], out[k2]
         @muladd out[k0] = y_k0 + y_k1 * wk1            + y_k2 * wk2
         @muladd out[k1] = y_k0 + y_k1 * wk1 * plus120  + y_k2 * wk2 * minus120
