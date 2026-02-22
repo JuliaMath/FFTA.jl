@@ -57,27 +57,52 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     right_idx = idx + root.right
     left = g[left_idx]
     right = g[right_idx]
-    N  = root.sz
+    # N  = root.sz
     N1 = left.sz
     N2 = right.sz
     s_in = root.s_in
     s_out = root.s_out
 
+    Rt = right.type
+    Lt = left.type
+
     w1 = _conj(root.w, d)
     wj1 = one(T)
     tmp = g.workspace[idx]
-    @inbounds for j1 in 0:N1-1
+
+    for j1 in 0:N1-1
         wk2 = wj1
-        fft!(tmp, in, N2*j1+1, start_in + j1*s_in, d, right.type, g, right_idx)
-        j1 > 0 && @inbounds for k2 in 1:N2-1
-            tmp[N2*j1 + k2 + 1] *= wk2
-            wk2 *= wj1
+        R_start_in  = start_in + j1 * s_in
+        R_start_out = 1 + N2 * j1
+
+        if Rt === BLUESTEIN
+            R_s_in  = right.s_in
+            R_s_out = right.s_out
+            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in)
+        else
+            fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
         end
+
+        if j1 > 0
+            @inbounds for k2 in 1:N2-1
+                tmp[R_start_out + k2] *= wk2
+                wk2 *= wj1
+            end
+        end
+
         wj1 *= w1
     end
 
-    @inbounds for k2 in 0:N2-1
-        fft!(out, tmp, start_out + k2*s_out, k2+1, d, left.type, g, left_idx)
+    for k2 in 0:N2-1
+        L_start_out = start_out + k2 * s_out
+        L_start_in  = 1 + k2
+        if Lt === BLUESTEIN
+            L_s_in  = left.s_in
+            L_s_out = left.s_out
+            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in)
+        else
+            fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
+        end
     end
 end
 
@@ -270,6 +295,22 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
 end
 
 
+function compute_bchirp(N::Int, d::Direction, ::Type{T}) where T
+    pad_len = nextpow(2, 2N - 1)
+
+    b_series = Vector{T}(undef, pad_len)
+    b_series[N+1:end] .= zero(T)
+
+    sgn = -direction_sign(d)
+    @. b_series[1:N] = cispi(sgn * mod((0:N-1)^2, (-N+1:N,)) / N)
+
+    # enforce periodic boundaries for b_n
+    for j in 0:N-1
+        b_series[pad_len-j] = b_series[2+j]
+    end
+    return b_series, pad_len
+end
+
 """
 $(TYPEDSIGNATURES)
 Bluestein's algorithm, still O(N * log(N)) for large primes,
@@ -298,24 +339,15 @@ function fft_bluestein!(
     start_in::Int, stride_in::Int
 ) where T<:Number
 
-    pad_len = nextpow(2, 2N - 1)
-
+    b_series, pad_len = compute_bchirp(N, d, T)
     a_series = Vector{T}(undef, pad_len)
-    b_series = Vector{T}(undef, pad_len)
     tmp      = Vector{T}(undef, pad_len)
 
     a_series[N+1:end] .= zero(T)
-    b_series[N+1:end] .= zero(T)
     tmp[N+1:end]      .= zero(T)
 
-    sgn = -direction_sign(d)
-    @. b_series[1:N] = cispi(sgn * mod((0:N-1)^2, (-N+1:N,)) / N)
     for i in 1:N
         a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
-    end
-    # enforce periodic boundaries for b_n
-    for j in 0:N-1
-        b_series[pad_len-j] = b_series[2+j]
     end
 
     w_pad = cispi(T(2) / pad_len)
