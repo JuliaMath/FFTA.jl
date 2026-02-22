@@ -11,7 +11,8 @@ using FFTA, Test
     @test y == fft(reshape(x, N, 1),    1)[:]
 end
 
-@testset "1D plan, 1D array. Size: $n" for n in 1:64
+# N = 73^2 tests preallocated fft_bluestein!, both right and left
+@testset "1D plan, 1D array. Size: $n" for n in [1:64; 73^2]
     x = randn(ComplexF64, n)
 
     @testset "against naive implementation" begin
