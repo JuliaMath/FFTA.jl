@@ -180,7 +180,7 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     w1 = w
     w2 = w * w1
     w3 = w * w2
-    w4 = w * w3
+    w4 = w2 * w2
 
     fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, w4)
     fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, w4)
@@ -302,7 +302,7 @@ function fft_bluestein!(
     tmp[N+1:end]      .= zero(T)
 
     sgn = -direction_sign(d)
-    @. b_series[1:N] = cispi(sgn * (0:N-1)^2 / N)
+    @. b_series[1:N] = cispi(sgn * mod((0:N-1)^2, (-N+1:N,)) / N)
     for i in 1:N
         a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
     end

@@ -6,8 +6,8 @@ using FFTA, Test
     y = bfft(x)
     y_ref = 0 * y
     y_ref[1] = N
-    atol = N == 103 ? 0.0 : 1e-12   # Bluestein has larger error, use rtol.
-    @test isapprox(y, y_ref; atol)
+    # atol = N == 103 ? 0.0 : 1e-12   # Bluestein has larger error, can use rtol
+    @test isapprox(y, y_ref; atol=1e-12)
 end
 
 @testset "1D plan, 1D array. Size: $n" for n in 1:64
