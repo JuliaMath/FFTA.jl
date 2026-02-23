@@ -76,7 +76,7 @@ function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_C
     else
         sort!(region)
         return FFTAPlan_cx{T,FFTN,R}(
-            ntuple(i -> CallGraph{T}(size(x, region[i])), Val(FFTN)),
+            ntuple(i -> CallGraph{T}(size(x, region[i]), BLUESTEIN_CUTOFF), Val(FFTN)),
             region, dir, FFTAInvPlan{T,FFTN}()
         )
     end
