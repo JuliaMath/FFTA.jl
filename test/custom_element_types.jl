@@ -7,11 +7,7 @@ x = randn(2*3*4*5)
 
     @testset "AbstractFFTs believes that single and double precision is everything." begin
         # Ref https://github.com/JuliaMath/FFTA.jl/issues/77
-        if T == BigFloat
-            @test_broken fft(Tx)
-        else
-            @test_broken fft(Tx) isa Vector{Complex{T}}
-        end
+        @test_broken fft(Tx) isa Vector{Complex{T}}
     end
 
     # Complex

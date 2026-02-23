@@ -16,8 +16,8 @@ function naive_1d_fourier_transform(x::Vector, d::FFTA.Direction)
     for u in 0:(n - 1)
         s = 0.0 + 0.0im
         for v in 0:(n - 1)
-            a = FFTA.direction_sign(d) * 2π * u * v / n
-            s += x[v + 1] * exp(im * a)
+            a = FFTA.direction_sign(d) * (2 * u * v) / n
+            s = muladd(x[v + 1], cispi(a), s)
         end
         y[u + 1] = s
     end
@@ -29,17 +29,13 @@ function naive_2d_fourier_transform(X::Matrix, d::FFTA.Direction)
     rows, cols = size(X)
     Y = zeros(Complex{Float64}, rows, cols)
 
-    for u in 0:(rows - 1)
-        for v in 0:(cols - 1)
-            s = 0.0 + 0.0im
-            for x in 0:(rows - 1)
-                for y in 0:(cols - 1)
-                    a = FFTA.direction_sign(d) * 2π * (u * x / rows + v * y / cols)
-                    s += X[x + 1, y + 1] * exp(im * a)
-                end
-            end
-            Y[u + 1, v + 1] = s
+    for u in 0:(rows - 1), v in 0:(cols - 1)
+        s = 0.0 + 0.0im
+        for x in 0:(rows - 1), y in 0:(cols - 1)
+            a = FFTA.direction_sign(d) * 2 * ((u * x) / rows + (v * y) / cols)
+            s = muladd(X[x + 1, y + 1], cispi(a), s)
         end
+        Y[u + 1, v + 1] = s
     end
 
     return Y

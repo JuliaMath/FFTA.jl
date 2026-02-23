@@ -60,17 +60,17 @@ AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Com
 AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Complex,N,R} =
     _plan_fft(x, region, FFT_BACKWARD; kwargs...)
 
-function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; kwargs...) where {T<:Complex,N,R}
+function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T<:Complex,N,R}
     FFTN = length(region)
     if FFTN == 1
         R1 = Int(region[])
-        g = CallGraph{T}(size(x, R1))
+        g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,1}()
         return FFTAPlan_cx{T,1,Int}((g,), R1, dir, pinv)
     elseif FFTN == 2
         sort!(region)
-        g1 = CallGraph{T}(size(x, region[1]))
-        g2 = CallGraph{T}(size(x, region[2]))
+        g1 = CallGraph{T}(size(x, region[1]), BLUESTEIN_CUTOFF)
+        g2 = CallGraph{T}(size(x, region[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,2}()
         return FFTAPlan_cx{T,2,R}((g1, g2), region, dir, pinv)
     else
@@ -78,7 +78,7 @@ function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; kwargs...) 
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Real,N,R}
+function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T<:Real,N,R}
     FFTN = length(region)
     if FFTN == 1
         R1 = Int(region[])
@@ -87,13 +87,13 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; kwargs...) whe
         # two n/2 complex FFTs followed by a butterfly. For odd size
         # problems, we just solve the problem as a single complex
         nn = iseven(n) ? n >> 1 : n
-        g = CallGraph{Complex{T}}(nn)
+        g = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{Complex{T},1}()
         return FFTAPlan_re{Complex{T},1,Int}((g,), R1, FFT_FORWARD, pinv, n)
     elseif FFTN == 2
         sort!(region)
-        g1 = CallGraph{Complex{T}}(size(x, region[1]))
-        g2 = CallGraph{Complex{T}}(size(x, region[2]))
+        g1 = CallGraph{Complex{T}}(size(x, region[1]), BLUESTEIN_CUTOFF)
+        g2 = CallGraph{Complex{T}}(size(x, region[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{Complex{T},2}()
         return FFTAPlan_re{Complex{T},2,R}((g1, g2), region, FFT_FORWARD, pinv, size(x, region[1]))
     else
@@ -101,7 +101,7 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; kwargs...) whe
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; kwargs...) where {T,N,R}
+function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T,N,R}
     FFTN = length(region)
     if FFTN == 1
         # For even length problems, we solve the real problem with
@@ -109,13 +109,13 @@ function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; kwargs..
         # problems, we just solve the problem as a single complex
         R1 = Int(region[])
         nn = iseven(len) ? len >> 1 : len
-        g = CallGraph{T}(nn)
+        g = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,1}()
         return FFTAPlan_re{T,1,Int}((g,), R1, FFT_BACKWARD, pinv, len)
     elseif FFTN == 2
         sort!(region)
-        g1 = CallGraph{T}(len)
-        g2 = CallGraph{T}(size(x, region[2]))
+        g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
+        g2 = CallGraph{T}(size(x, region[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,2}()
         return FFTAPlan_re{T,2,R}((g1, g2), region, FFT_BACKWARD, pinv, len)
     else
@@ -136,6 +136,7 @@ function LinearAlgebra.mul!(y::AbstractVector{U}, p::FFTAPlan_cx{T,1}, x::Abstra
         throw(DimensionMismatch("plan has axes $(size(p)), but input array has axes $(size(x))"))
     end
     fft!(y, x, 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
+    return y
 end
 
 #### 1D plan ND array
@@ -150,6 +151,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
     Rpre = CartesianIndices(size(x)[1:p.region[]-1])
     Rpost = CartesianIndices(size(x)[p.region[]+1:end])
     _mul_loop!(y, x, Rpre, Rpost, p)
+    return y
 end
 
 function _mul_loop!(
@@ -184,6 +186,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,2}, x::Abstr
     # is partly because the region field of the plan is abstractly typed but even if that wasn't the case,
     # it might be a bit tricky to construct the Rxs in an inferred way.
     _mul_loop!(y_tmp, y, x, p, R1, R2, R3, rows, cols)
+    return y
 end
 
 function _mul_loop!(

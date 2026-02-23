@@ -4,14 +4,15 @@ using FFTA, Test
 @testset verbose = true " forward. N=$N" for N in [8, 11, 15, 16, 27, 100, 275]
     x = ones(ComplexF64, N)
     y = fft(x)
-    y_ref = 0 * y
+    y_ref = zero(y)
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
     @test y == fft(reshape(x, 1, 1, N), 3)[:]
     @test y == fft(reshape(x, N, 1),    1)[:]
 end
 
-@testset "1D plan, 1D array. Size: $n" for n in 1:64
+# N = 73^2 tests preallocated fft_bluestein!, both right and left
+@testset "1D plan, 1D array. Size: $n" for n in [1:64; 73^2]
     x = randn(ComplexF64, n)
 
     @testset "against naive implementation" begin

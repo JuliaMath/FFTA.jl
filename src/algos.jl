@@ -4,26 +4,34 @@ end
 
 @inline _conj(w::Complex, d::Direction) = ifelse(direction_sign(d) === 1, w, conj(w))
 
-function fft!(out::AbstractVector{T}, in::AbstractVector{T}, start_out::Int, start_in::Int, d::Direction, t::FFTEnum, g::CallGraph{T}, idx::Int) where T
+function fft!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    start_out::Int, start_in::Int,
+    d::Direction,
+    t::FFTEnum,
+    g::CallGraph{T},
+    idx::Int
+    ) where T
     if t === COMPOSITE_FFT
         fft_composite!(out, in, start_out, start_in, d, g, idx)
     else
         root = g[idx]
-        if t == DFT
-            fft_dft!(out, in, root.sz, start_out, root.s_out, start_in, root.s_in, _conj(root.w, d))
+        s_in = root.s_in
+        s_out = root.s_out
+        N = root.sz
+        w = _conj(root.w, d)
+        if t === DFT
+            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, w)
+        elseif t === POW2RADIX4_FFT
+            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, w)
+        elseif t === POW3_FFT
+            _m_120 = cispi(T(2) / 3)
+            m_120 = d === FFT_FORWARD ? _m_120 : conj(_m_120)
+            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, w, m_120)
+        elseif t === BLUESTEIN
+            fft_bluestein!(out, in, d, N, start_out, s_out, start_in, s_in)
         else
-            s_in = root.s_in
-            s_out = root.s_out
-            if t === POW2RADIX4_FFT
-                fft_pow2_radix4!(out, in, root.sz, start_out, s_out, start_in, s_in, _conj(root.w, d))
-            elseif t === POW3_FFT
-                p_120 = cispi(T(2)/3)
-                m_120 = cispi(T(4)/3)
-                _p_120, _m_120 = d == FFT_FORWARD ? (p_120, m_120) : (m_120, p_120)
-                fft_pow3!(out, in, root.sz, start_out, s_out, start_in, s_in, _conj(root.w, d), _m_120, _p_120)
-            else
-                throw(ArgumentError("kernel not implemented"))
-            end
+            throw(ArgumentError("kernel not implemented"))
         end
     end
 end
@@ -49,27 +57,58 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     right_idx = idx + root.right
     left = g[left_idx]
     right = g[right_idx]
-    N  = root.sz
+    # N  = root.sz
     N1 = left.sz
     N2 = right.sz
     s_in = root.s_in
     s_out = root.s_out
 
+    Rt = right.type
+    Lt = left.type
+
     w1 = _conj(root.w, d)
     wj1 = one(T)
     tmp = g.workspace[idx]
-    @inbounds for j1 in 0:N1-1
+
+    if Rt === BLUESTEIN
+        R_scratch = prealloc_blue(N2, d, T)
+    end
+    for j1 in 0:N1-1
         wk2 = wj1
-        fft!(tmp, in, N2*j1+1, start_in + j1*s_in, d, right.type, g, right_idx)
-        j1 > 0 && @inbounds for k2 in 1:N2-1
-            tmp[N2*j1 + k2 + 1] *= wk2
-            wk2 *= wj1
+        R_start_in  = start_in + j1 * s_in
+        R_start_out = 1 + N2 * j1
+
+        if Rt === BLUESTEIN
+            R_s_in  = right.s_in
+            R_s_out = right.s_out
+            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_scratch)
+        else
+            fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
         end
+
+        if j1 > 0
+            @inbounds for k2 in 1:N2-1
+                tmp[R_start_out + k2] *= wk2
+                wk2 *= wj1
+            end
+        end
+
         wj1 *= w1
     end
 
-    @inbounds for k2 in 0:N2-1
-        fft!(out, tmp, start_out + k2*s_out, k2+1, d, left.type, g, left_idx)
+    if Lt === BLUESTEIN
+        L_scratch = prealloc_blue(N1, d, T)
+    end
+    for k2 in 0:N2-1
+        L_start_out = start_out + k2 * s_out
+        L_start_in  = 1 + k2
+        if Lt === BLUESTEIN
+            L_s_in  = left.s_in
+            L_s_out = left.s_out
+            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_scratch)
+        else
+            fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
+        end
     end
 end
 
@@ -178,7 +217,7 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     w1 = w
     w2 = w * w1
     w3 = w * w2
-    w4 = w * w3
+    w4 = w2 * w2
 
     fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, w4)
     fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, w4)
@@ -228,7 +267,8 @@ Power of 3 FFT, in place
 - `minus120`: Depending on direction, perform either ∓120° rotation
 
 """
-function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, plus120::T, minus120::T) where {T, U}
+function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, minus120::T) where {T, U}
+    plus120 = conj(minus120)
     if N == 3
         @muladd out[start_out + 0]            = in[start_in] + in[start_in + stride_in]          + in[start_in + 2*stride_in]
         @muladd out[start_out +   stride_out] = in[start_in] + in[start_in + stride_in]*plus120  + in[start_in + 2*stride_in]*minus120
@@ -240,17 +280,17 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     Nprime = N ÷ 3
 
     # Dividing into subproblems
-    fft_pow3!(out, in, Nprime, start_out, stride_out, start_in, stride_in*3, w^3, plus120, minus120)
-    fft_pow3!(out, in, Nprime, start_out + Nprime*stride_out, stride_out, start_in + stride_in, stride_in*3, w^3, plus120, minus120)
-    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w^3, plus120, minus120)
+    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, w^3, minus120)
+    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, w^3, minus120)
+    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w^3, minus120)
 
     w1 = w
     w2 = w * w1
     wk1 = wk2 = one(T)
     for k in 0:Nprime-1
-        @muladd k0 = start_out + stride_out * k
-        @muladd k1 = start_out + stride_out * (k + Nprime)
-        @muladd k2 = start_out + stride_out * (k + 2 * Nprime)
+        k0 = start_out + stride_out * k
+        k1 = start_out + stride_out * (k + Nprime)
+        k2 = start_out + stride_out * (k + 2 * Nprime)
         y_k0, y_k1, y_k2 = out[k0], out[k1], out[k2]
         @muladd out[k0] = y_k0 + y_k1 * wk1            + y_k2 * wk2
         @muladd out[k1] = y_k0 + y_k1 * wk1 * plus120  + y_k2 * wk2 * minus120
@@ -258,4 +298,88 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
         wk1 *= w1
         wk2 *= w2
     end
+end
+
+
+function prealloc_blue(N::Int, d::Direction, ::Type{T}) where T<:Number
+    pad_len = nextpow(2, 2N - 1)
+
+    b_series = Vector{T}(undef, pad_len)
+    a_series = Vector{T}(undef, pad_len)
+    tmp      = Vector{T}(undef, pad_len)
+
+    b_series[N+1:end] .= zero(T)
+
+    sgn = -direction_sign(d)
+    p = 0   # n^2
+    for i in 1:N
+        b_series[i] = cispi(sgn * p / N)
+        p += (2i - 1)   # prevents overflow unless N is absolutely massive
+        p > N && (p -= 2N)
+    end
+
+    # enforce periodic boundaries for b_n
+    for j in 0:N-1
+        b_series[pad_len-j] = b_series[2+j]
+    end
+
+    return (tmp, a_series, b_series, pad_len)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Bluestein's algorithm, still O(N * log(N)) for large primes,
+but with a big constant factor.
+Zero-pads two sequences derived from the DFT formula to a
+power of 2 length greater than `2N-1` and computes their convolution
+with a power 2 FFT.
+
+# Arguments
+- `out`: Output vector
+- `in`: Input vector
+- `d`: Direction of the transform
+- `N`: Size of the transform
+- `start_out`: Index of the first element of the output vector
+- `stride_out`: Stride of the output vector
+- `start_in`: Index of the first element of the input vector
+- `stride_in`: Stride of the input vector
+- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+
+"""
+function fft_bluestein!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    d::Direction,
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int,  stride_in::Int,
+    scratch::Tuple{Vector{T},Vector{T},Vector{T},Int}=prealloc_blue(N, d, T)
+) where T<:Number
+
+    (tmp, a_series, b_series, pad_len) = scratch
+
+    a_series[N+1:end] .= zero(T)
+    tmp[N+1:end]      .= zero(T)
+
+    for i in 1:N
+        a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
+    end
+
+    w_pad = cispi(T(2) / pad_len)
+    # leave b_n vector alone for last step
+    fft_pow2_radix4!(tmp,      a_series, pad_len, 1, 1, 1, 1, w_pad)    # Fa
+    fft_pow2_radix4!(a_series, b_series, pad_len, 1, 1, 1, 1, w_pad)    # Fb
+
+    tmp .*= a_series
+    # convolution theorem ifft
+    fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, conj(w_pad))
+    conv_a_b = a_series
+
+    Xk = tmp
+    for i in 1:N
+        Xk[i] = conj(b_series[i]) * conv_a_b[i] / pad_len
+    end
+
+    out_inds = range(start_out; step=stride_out, length=N)
+    copyto!(out, CartesianIndices((out_inds,)), Xk, CartesianIndices((N,)))
+    return nothing
 end
