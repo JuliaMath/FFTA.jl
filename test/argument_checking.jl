@@ -83,7 +83,7 @@ end
         @test_throws DimensionMismatch LinearAlgebra.mul!(y1, plan_fft(x1), x1)
     end
 
-    @testset "$(N)D array" for N in 2:3
+    @testset "$(N)D array" for N in 2:4
         xN = randn(ComplexF64, ntuple(i -> 3, N))
         yN = similar(xN, size(xN) .+ 1)
 
@@ -93,6 +93,7 @@ end
 
         @testset "$(N)D plan" begin
             @test_throws DimensionMismatch LinearAlgebra.mul!(yN, plan_fft(xN), xN)
+            @test_throws DimensionMismatch LinearAlgebra.mul!(yN, plan_fft(xN, 1:N-1), xN)
         end
     end
 end
