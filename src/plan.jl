@@ -133,6 +133,7 @@ end
 ### Complex
 #### 1D plan 1D array
 function LinearAlgebra.mul!(y::AbstractVector{U}, p::FFTAPlan_cx{T,1}, x::AbstractVector{T}) where {T,U}
+    Base.require_one_based_indexing(x, y)
     if axes(x) != axes(y)
         throw(DimensionMismatch("input array has axes $(axes(x)), but output array has axes $(axes(y))"))
     end
@@ -145,14 +146,14 @@ end
 
 #### 1D plan ND array
 function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::AbstractArray{T,N}) where {T,U,N}
-    Base.require_one_based_indexing(x)
+    Base.require_one_based_indexing(x, y)
     if axes(x) != axes(y)
         throw(DimensionMismatch("input array has axes $(axes(x)), but output array has axes $(axes(y))"))
     end
     if size(p, 1) != size(x, p.region[])
         throw(DimensionMismatch("plan has size $(size(p, 1)), but input array has size $(size(x, p.region[])) along region $(p.region[])"))
     end
-    Rpre = CartesianIndices(size(x)[1:p.region[]-1])
+    Rpre  = CartesianIndices(size(x)[1:p.region[]-1])
     Rpost = CartesianIndices(size(x)[p.region[]+1:end])
     _mul_loop!(y, x, Rpre, Rpost, p)
     return y
