@@ -311,8 +311,11 @@ function prealloc_blue(N::Int, d::Direction, ::Type{T}) where T<:Number
     b_series[N+1:end] .= zero(T)
 
     sgn = -direction_sign(d)
+    p = 0   # n^2
     for i in 1:N
-        b_series[i] = cispi(sgn * mod((i - 1)^2, -N+1:N) / N)
+        b_series[i] = cispi(sgn * p / N)
+        p += (2i - 1)   # prevents overflow unless N is absolutely massive
+        p > N && (p -= 2N)
     end
 
     # enforce periodic boundaries for b_n
