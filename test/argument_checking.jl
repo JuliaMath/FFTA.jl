@@ -23,6 +23,9 @@ end
         @test_throws DimensionMismatch plan_bfft(xc1) * xc1p
         @test_throws DimensionMismatch plan_rfft(xr1) * xr1p
         @test_throws DimensionMismatch plan_brfft(yr1, length(xr1)) * yr1p
+
+        @test_throws ArgumentError("only FFT_BACKWARD supported for complex vectors") plan_rfft(xr1) * xc1
+        @test_throws ArgumentError("only FFT_FORWARD supported for real vectors") plan_brfft(xc1, 5) * xr1
     end
 
     @testset "2D array" begin
@@ -45,6 +48,9 @@ end
             @test_throws DimensionMismatch plan_bfft(xc2, region) * xc2p
             @test_throws DimensionMismatch plan_rfft(xr2, region) * xr2p
             @test_throws DimensionMismatch plan_brfft(yr2, size(xr2, region), region) * yr2p
+
+            @test_throws ArgumentError("only FFT_BACKWARD supported for complex arrays") plan_rfft(xr2, region) * xc2
+            @test_throws ArgumentError("only FFT_FORWARD supported for real arrays") plan_brfft(xc2, 5, region) * xr2
         end
 
         @testset "2D plan" begin
@@ -56,6 +62,9 @@ end
             @test_throws DimensionMismatch plan_bfft(xc2) * xc2p
             @test_throws DimensionMismatch plan_rfft(xr2) * xr2p
             @test_throws DimensionMismatch plan_brfft(yr2, size(xr2, 1)) * yr2p
+
+            @test_throws ArgumentError("only FFT_BACKWARD supported for complex arrays") plan_rfft(xr2, 1:2) * xc2
+            @test_throws ArgumentError("only FFT_FORWARD supported for real arrays") plan_brfft(xc2, 5, 1:2) * xr2
         end
     end
     @testset "3D array" begin
@@ -95,5 +104,25 @@ end
             @test_throws DimensionMismatch LinearAlgebra.mul!(yN, plan_fft(xN), xN)
             @test_throws DimensionMismatch LinearAlgebra.mul!(yN, plan_fft(xN, 1:N-1), xN)
         end
+    end
+end
+
+@testset "Plan Base.size" begin
+    @testset "plan_fft" for sz in ((103,), (8, 11), (6, 24, 25))
+        x_c = rand(ComplexF64, sz)
+        p_c = plan_fft(x_c)
+        @test size(p_c) == sz
+        @test size(p_c, 1 + length(sz)) == 1
+        @test_throws DomainError size(p_c, 0)
+        @test_throws DomainError size(p_c, -1)
+    end
+
+    @testset "plan_rfft" for sz in ((103,), (8, 11))
+        x_r = rand(Float64, sz)
+        p_r = plan_rfft(x_r)
+        @test size(p_r) == sz
+        @test size(p_r, 1 + length(sz)) == 1
+        @test_throws DomainError size(p_r, 0)
+        @test_throws DomainError size(p_r, -1)
     end
 end
