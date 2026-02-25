@@ -10,18 +10,18 @@ using FFTA, Test
     y[2, 2, 2] = 1
     w1 = -0.5 - sqrt(3)im / 2
     w2 = conj(w1)
-    y_ref = ComplexF64[
-        1 w1 w2;
-        w1 w2 1;
-        w2 1 w1
-        ;;;
-        w1 w2 1;
-        w2 1 w1;
-        1 w1 w2
-        ;;;
-        w2 1 w1;
-        1 w1 w2;
-        w1 w2 1
-    ]
+    y_ref = reshape(ComplexF64[
+            1 w1 w2;
+            w1 w2 1;
+            w2 1 w1
+            ;;;
+            w1 w2 1;
+            w2 1 w1;
+            1 w1 w2
+            ;;;
+            w2 1 w1;
+            1 w1 w2;
+            w1 w2 1
+        ], 3, 3, 3)
     @test isapprox(fft(y), y_ref)
 end
