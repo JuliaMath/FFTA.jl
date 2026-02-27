@@ -71,17 +71,17 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     tmp = g.workspace[idx]
 
     if Rt === BLUESTEIN
-        R_scratch = prealloc_blue(N2, d, T)
+        R_bluestein_scratchspace = prealloc_blue(N2, d, T)
     end
     for j1 in 0:N1-1
         wk2 = wj1
         R_start_in  = start_in + j1 * s_in
         R_start_out = 1 + N2 * j1
 
-        if Rt === BLUESTEIN
+        if @isdefined R_bluestein_scratchspace
             R_s_in  = right.s_in
             R_s_out = right.s_out
-            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_scratch)
+            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_bluestein_scratchspace)
         else
             fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
         end
@@ -97,15 +97,15 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     end
 
     if Lt === BLUESTEIN
-        L_scratch = prealloc_blue(N1, d, T)
+        L_bluestein_scratchspace = prealloc_blue(N1, d, T)
     end
     for k2 in 0:N2-1
         L_start_out = start_out + k2 * s_out
         L_start_in  = 1 + k2
-        if Lt === BLUESTEIN
+        if @isdefined L_bluestein_scratchspace
             L_s_in  = left.s_in
             L_s_out = left.s_out
-            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_scratch)
+            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_bluestein_scratchspace)
         else
             fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
         end
