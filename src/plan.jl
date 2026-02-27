@@ -52,7 +52,7 @@ AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Com
 AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region::R; kwargs...) where {T<:Complex,N,R} =
     _plan_fft(x, region, FFT_BACKWARD; kwargs...)
 
-function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T<:Complex,N,R}
+function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...) where {T<:Complex,N,R}
     FFTN = length(region)
     if FFTN == 1
         R1 = Int(region[])
@@ -74,7 +74,7 @@ function _plan_fft(x::AbstractArray{T,N}, region::R, dir::Direction; BLUESTEIN_C
     end
 end
 
-function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T<:Real,N,R}
+function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...) where {T<:Real,N,R}
     FFTN = length(region)
     if FFTN == 1
         R1 = Int(region[])
@@ -97,7 +97,7 @@ function AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region::R; BLUESTEIN_CUTO
     end
 end
 
-function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, kwargs...) where {T,N,R}
+function AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len, region::R; BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...) where {T,N,R}
     FFTN = length(region)
     if FFTN == 1
         # For even length problems, we solve the real problem with
