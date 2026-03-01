@@ -27,7 +27,7 @@ jobs:
 
       - name: Download benchmark results from CI (if no local results)
         if: steps.check_local.outputs.has_local != 'true'
-        uses: dawidd6/action-download-artifact@v15
+        uses: dawidd6/action-download-artifact@v16
         with:
           workflow: benchmarks.yml
           name_is_regexp: true
