@@ -175,7 +175,7 @@ end
             throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
         elseif size(p) != size(X)
             throw(DimensionMismatch("plan has size $(size(p)), but input array has size $(size(X))"))
-        elseif !(p.region == N || p.region == 1:N)
+        elseif !(p.region == 1:N || p.region == 1)
             throw(DimensionMismatch("Plan region is outside array dimensions."))
         end
 
@@ -195,10 +195,7 @@ end
             resize!(ibuf, n)
             cg = p.callgraph[dim]
 
-            Rpre_{dim}  = CartesianIndices(sz[1:dim-1])
-            Rpost_{dim} = CartesianIndices(sz[dim+1:N])
-
-            fft_along_dim!(out, ibuf, obuf, cg, dir, Rpre_{dim}, Rpost_{dim})
+            fft_along_dim!(out, ibuf, obuf, cg, dir, Val(dim))
         end
 
         return out
@@ -214,11 +211,12 @@ function LinearAlgebra.mul!(
     Base.require_one_based_indexing(out, X)
     if size(out) != size(X)
         throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
+    elseif length(p.region) != M || !issorted(p.region; lt=(<=))
+        throw(DimensionMismatch("Region is invalid."))
     elseif M > N || first(p.region) < 1 || last(p.region) > N
         throw(DimensionMismatch("Plan region is outside array dimensions."))
     end
 
-    sz = size(X)
     max_sz = maximum(Base.Fix1(size, out), p.region)
     obuf = Vector{T}(undef, max_sz)
     ibuf = Vector{T}(undef, max_sz)
@@ -228,32 +226,49 @@ function LinearAlgebra.mul!(
 
     copyto!(out, X) # operate in-place on output array
 
-    # don't use generated functions because this cannot be type-stable anyway
-    for dim in 1:M
-        pdim = p.region[dim]
-        n = size(out, pdim)
-        resize!(obuf, n)
-        resize!(ibuf, n)
-        cg = p.callgraph[dim]
+    if @generated
+        quote
+            k = 1
+            # region is assumed to be pre-sorted during planning
+            Base.Cartesian.@nexprs $N dim -> begin
+                if p.region[k] == dim
+                    n = size(out, dim)
+                    resize!(obuf, n)
+                    resize!(ibuf, n)
+                    cg = p.callgraph[k]
 
-        Rpre  = CartesianIndices(sz[1:pdim-1])
-        Rpost = CartesianIndices(sz[pdim+1:N])
+                    fft_along_dim!(out, ibuf, obuf, cg, dir, Val(dim))
 
-        fft_along_dim!(out, ibuf, obuf, cg, dir, Rpre, Rpost)
+                    k = min(k + 1, M)
+                end
+            end
+        end
+    else
+        for dim in 1:M
+            pdim = p.region[dim]
+            n = size(out, pdim)
+            resize!(obuf, n)
+            resize!(ibuf, n)
+            cg = p.callgraph[dim]
+
+            fft_along_dim!(out, ibuf, obuf, cg, dir, Val(pdim))
+        end
     end
 
     return out
 end
 
 function fft_along_dim!(
-    A::AbstractArray,
+    A::AbstractArray{U,N},
     ibuf::Vector{T}, obuf::Vector{T},
     cg::CallGraph{T}, d::Direction,
-    Rpre::CartesianIndices{M}, Rpost::CartesianIndices
-) where {T <: Complex{<:AbstractFloat}, M}
+    ::Val{dim}
+) where {T <: Complex{<:AbstractFloat}, U, N, dim}
 
+    sz = size(A)
+    Rpre  = CartesianIndices(sz[1:dim-1])
+    Rpost = CartesianIndices(sz[dim+1:N])
     t = cg[1].type
-    dim = M + 1
     cols = eachindex(axes(A, dim), ibuf, obuf)
 
     for Ipost in Rpost, Ipre in Rpre
