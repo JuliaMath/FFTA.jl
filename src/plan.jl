@@ -199,8 +199,8 @@ function _mul_loop!(
     p::FFTAPlan_cx{T,1},
     ::Val{R}
 ) where {T,U,N,R}
-    Rpre  = CartesianIndices(size(x)[1:R-1])
-    Rpost = CartesianIndices(size(x)[R+1:N])
+    Rpre  = CartesianIndices(ntuple(Base.Fix1(size, x),  Val(R - 1)))
+    Rpost = CartesianIndices(ntuple(i -> size(x, R + i), Val(N - R)))
     for Ipost in Rpost, Ipre in Rpre
         @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
     end
@@ -331,9 +331,8 @@ function fft_along_dim!(
     ::Val{dim}
 ) where {T <: Complex{<:AbstractFloat}, U, N, dim}
 
-    sz = size(A)
-    Rpre  = CartesianIndices(sz[1:dim-1])
-    Rpost = CartesianIndices(sz[dim+1:N])
+    Rpre  = CartesianIndices(ntuple(Base.Fix1(size, A),    Val(dim - 1)))
+    Rpost = CartesianIndices(ntuple(i -> size(A, dim + i), Val(N - dim)))
     t = cg[1].type
     cols = eachindex(axes(A, dim), ibuf, obuf)
 
