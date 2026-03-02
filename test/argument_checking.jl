@@ -126,3 +126,22 @@ end
         @test_throws DomainError size(p_r, -1)
     end
 end
+
+@testset "Invalid / mutated dims" verbose=true begin
+    @testset "Extra elements" begin
+        for n in 3:5
+            x = rand(ComplexF64, ntuple(Returns(2), n))
+            p1 = plan_fft(x, [1:n-1;])
+            push!(p1.region, n)
+            @test_throws DimensionMismatch("Region is invalid.") p1 * x
+        end
+    end
+    @testset "Unsorted dims" begin
+        for n in 3:5
+            x = rand(ComplexF64, ntuple(Returns(2), n))
+            p2 = plan_fft(x, [1:n-1;])
+            p2.region[1:2] = [2, 1]
+            @test_throws DimensionMismatch("Region is invalid.") p2 * x
+        end
+    end
+end
