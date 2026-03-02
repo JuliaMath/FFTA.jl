@@ -207,33 +207,43 @@ function _mul_loop!(
 end
 
 #### ND plan ND array
-@generated function LinearAlgebra.mul!(
+function LinearAlgebra.mul!(
     out::AbstractArray{U,N},
     p::FFTAPlan_cx{T,N},
     X::AbstractArray{T,N}
 ) where {T,U,N}
+    Base.require_one_based_indexing(out, X)
+    if size(out) != size(X)
+        throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
+    elseif size(p) != size(X)
+        throw(DimensionMismatch("plan has size $(size(p)), but input array has size $(size(X))"))
+    elseif !(p.region == 1:N || p.region == 1)
+        throw(DimensionMismatch("Plan region is outside array dimensions."))
+    end
 
-    quote
-        Base.require_one_based_indexing(out, X)
-        if size(out) != size(X)
-            throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
-        elseif size(p) != size(X)
-            throw(DimensionMismatch("plan has size $(size(p)), but input array has size $(size(X))"))
-        elseif !(p.region == 1:N || p.region == 1)
-            throw(DimensionMismatch("Plan region is outside array dimensions."))
+    sz = size(X)
+    max_sz = maximum(sz)
+    obuf = Vector{T}(undef, max_sz)
+    ibuf = Vector{T}(undef, max_sz)
+    sizehint!(obuf, max_sz) # not guaranteed but hopefully prevents allocations
+    sizehint!(ibuf, max_sz)
+    dir = p.dir
+
+    copyto!(out, X) # operate in-place on output array
+
+    if @generated
+        quote
+            Base.Cartesian.@nexprs $N dim -> begin
+                n = size(out, dim)
+                resize!(obuf, n)
+                resize!(ibuf, n)
+                cg = p.callgraph[dim]
+
+                fft_along_dim!(out, ibuf, obuf, cg, dir, Val(dim))
+            end
         end
-
-        sz = size(X)
-        max_sz = maximum(sz)
-        obuf = Vector{T}(undef, max_sz)
-        ibuf = Vector{T}(undef, max_sz)
-        sizehint!(obuf, max_sz) # not guaranteed but hopefully prevents allocations
-        sizehint!(ibuf, max_sz)
-        dir = p.dir
-
-        copyto!(out, X) # operate in-place on output array
-
-        Base.Cartesian.@nexprs $N dim -> begin
+    else
+        for dim in 1:N
             n = size(out, dim)
             resize!(obuf, n)
             resize!(ibuf, n)
@@ -241,9 +251,9 @@ end
 
             fft_along_dim!(out, ibuf, obuf, cg, dir, Val(dim))
         end
-
-        return out
     end
+
+    return out
 end
 
 #### MD plan ND array (M<N)
@@ -266,40 +276,52 @@ function LinearAlgebra.mul!(
     ibuf = Vector{T}(undef, max_sz)
     sizehint!(obuf, max_sz) # not guaranteed but hopefully prevents allocations
     sizehint!(ibuf, max_sz)
-    dir = p.dir
 
     copyto!(out, X) # operate in-place on output array
 
+    _execute_mdfft!(out, ibuf, obuf, p.dir, p.region, p.callgraph)
+
+    return out
+end
+
+@noinline function _execute_mdfft!(
+    out::AbstractArray{U,N},
+    ibuf::Vector{T}, obuf::Vector{T},
+    dir::Direction,
+    @nospecialize(region::RegionTypes),
+    @nospecialize(callgraphs::NTuple)
+) where {T,U,N}
+
+    M = length(region)
     if @generated
         quote
             k = 1
             # region is assumed to be pre-sorted during planning
             Base.Cartesian.@nexprs $N dim -> begin
-                if p.region[k] == dim
+                if region[k] == dim
                     n = size(out, dim)
                     resize!(obuf, n)
                     resize!(ibuf, n)
-                    cg = p.callgraph[k]
+                    cg = callgraphs[k]
 
                     fft_along_dim!(out, ibuf, obuf, cg, dir, Val(dim))
 
                     k = min(k + 1, M)
                 end
             end
+            return nothing
         end
     else
         for dim in 1:M
-            pdim = p.region[dim]
+            pdim = region[dim]
             n = size(out, pdim)
             resize!(obuf, n)
             resize!(ibuf, n)
-            cg = p.callgraph[dim]
+            cg = callgraphs[dim]
 
             fft_along_dim!(out, ibuf, obuf, cg, dir, Val(pdim))
         end
     end
-
-    return out
 end
 
 function fft_along_dim!(
