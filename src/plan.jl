@@ -49,16 +49,20 @@ Base.size(p::FFTAPlan{<:Any,N}) where N = ntuple(Base.Fix1(size, p), Val{N}())
 Base.complex(p::FFTAPlan_re{T,N,R}) where {T,N,R} = FFTAPlan_cx{T,N,R}(p.callgraph, p.region, p.dir, p.pinv)
 
 function _sort(region::T)::T where {N,T<:NTuple{N,Int}}
-    if N == 2
-        minmax(region[1], region[2])
-    elseif N == 3
-        t1, t2, t3 = region
-        t1, t2 = minmax(t1, t2)
-        t2, t3 = minmax(t2, t3)
-        t1, t2 = minmax(t1, t2)
-        return (t1, t2, t3)
+    @static if VERSION >= v"1.12"
+        sort(region)
     else
-        @static VERSION >= v"1.12" ? sort(region) : NTuple{N}(sort!(collect(region)))
+        if N == 2
+            minmax(region[1], region[2])
+        elseif N == 3
+            t1, t2, t3 = region
+            t1, t2 = minmax(t1, t2)
+            t2, t3 = minmax(t2, t3)
+            t1, t2 = minmax(t1, t2)
+            (t1, t2, t3)
+        else
+            NTuple{N}(sort!(collect(region)))
+        end
     end
 end
 
@@ -78,7 +82,7 @@ function _plan_fft(
 ) where {T<:Complex,N}
     M = length(region)
     if M == 1
-        R1 = Int(region[])
+        R1 = Int(region[1])
         g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,1}()
         return FFTAPlan_cx{T,1,Int}((g,), R1, dir, pinv)
@@ -87,10 +91,10 @@ function _plan_fft(
         g1 = CallGraph{T}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_cx{T,2,typeof(R2)}((g1, g2), R2, dir, pinv)
+        return FFTAPlan_cx{T,2}((g1, g2), R2, dir, pinv)
     else
         RM = _sort(region)
-        return FFTAPlan_cx{T,M,typeof(RM)}(
+        return FFTAPlan_cx{T,M}(
             ntuple(i -> CallGraph{T}(size(x, RM[i]), BLUESTEIN_CUTOFF), Val(M)),
             RM, dir, FFTAInvPlan{T,M}()
         )
@@ -104,7 +108,7 @@ function AbstractFFTs.plan_rfft(
 ) where {T<:Real,N}
     M = length(region)
     if M == 1
-        R1 = Int(region[])
+        R1 = Int(region[1])
         n = size(x, R1)
         # For even length problems, we solve the real problem with
         # two n/2 complex FFTs followed by a butterfly. For odd size
@@ -118,7 +122,7 @@ function AbstractFFTs.plan_rfft(
         g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{Complex{T},2}()
-        return FFTAPlan_re{Complex{T},2,typeof(R2)}((g1, g2), R2, FFT_FORWARD, pinv, size(x, R2[1]))
+        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, pinv, size(x, R2[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -135,7 +139,7 @@ function AbstractFFTs.plan_brfft(
         # For even length problems, we solve the real problem with
         # two n/2 complex FFTs followed by a butterfly. For odd size
         # problems, we just solve the problem as a single complex
-        R1 = Int(region[])
+        R1 = Int(region[1])
         nn = iseven(len) ? len >> 1 : len
         g = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,1}()
@@ -145,7 +149,7 @@ function AbstractFFTs.plan_brfft(
         g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
         pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_re{T,2,typeof(R2)}((g1, g2), R2, FFT_BACKWARD, pinv, len)
+        return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, pinv, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -177,7 +181,7 @@ function LinearAlgebra.mul!(y::AbstractArray{U,N}, p::FFTAPlan_cx{T,1}, x::Abstr
         throw(DimensionMismatch("input array has axes $ax_x, but output array has axes $ax_y"))
     end
 
-    R1 = p.region[]
+    R1 = only(p.region)
     plen, xlen = size(p, 1), size(x, R1)
     if plen != xlen
         throw(DimensionMismatch("plan has size $plen, but input array has size $xlen along region $R1"))
@@ -217,7 +221,7 @@ function LinearAlgebra.mul!(
         throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
     elseif size(p) != size(X)
         throw(DimensionMismatch("plan has size $(size(p)), but input array has size $(size(X))"))
-    elseif !(p.region == 1:N || p.region == 1)
+    elseif !region_isvalid(p.region, N)
         throw(DimensionMismatch("Plan region is outside array dimensions."))
     end
 
@@ -265,7 +269,7 @@ function LinearAlgebra.mul!(
     Base.require_one_based_indexing(out, X)
     if size(out) != size(X)
         throw(DimensionMismatch("input array has axes $(axes(X)), but output array has axes $(axes(out))"))
-    elseif length(p.region) != M || !issorted(p.region; lt=(<=))
+    elseif !region_isvalid(p.region, M, N)
         throw(DimensionMismatch("Region is invalid."))
     elseif M > N || first(p.region) < 1 || last(p.region) > N
         throw(DimensionMismatch("Plan region is outside array dimensions."))
@@ -347,6 +351,27 @@ function fft_along_dim!(
     end
 end
 
+region_isvalid(r::Int, N::Int, _::Int=0) = r == N == 1
+region_isvalid(r::AbstractVector{Int}, N::Int) = r == 1:N
+region_isvalid(r::AbstractRange{Int}, M::Int, _::Int) = issorted(r) && length(r) == M
+function region_isvalid(r::NTuple{M,Int}, N::Int) where M
+    isvalid = M == N
+    for i in 1:M
+        isvalid &= (r[i] == i)
+    end
+    isvalid
+end
+function region_isvalid(r::Union{AbstractVector{Int},NTuple{<:Any,Int}}, M::Int, _::Int)
+    isvalid = length(r) == M
+    maybe_p = Iterators.peel(r)
+    isnothing(maybe_p) && return isvalid
+    p, rest = maybe_p
+    for n in rest
+        isvalid = isvalid && (p < n)
+        p = n
+    end
+    isvalid
+end
 
 ## *
 ### Complex
