@@ -205,8 +205,10 @@ function _mul_loop!(
 ) where {T,U,N,R}
     Rpre  = CartesianIndices(ntuple(Base.Fix1(size, x),  Val(R - 1)))
     Rpost = CartesianIndices(ntuple(i -> size(x, R + i), Val(N - R)))
+    cg = p.callgraph[1]
+    t = cg[1].type
     for Ipost in Rpost, Ipre in Rpre
-        @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, p.callgraph[1][1].type, p.callgraph[1], 1)
+        @views fft!(y[Ipre,:,Ipost], x[Ipre,:,Ipost], 1, 1, p.dir, t, cg, 1)
     end
 end
 
