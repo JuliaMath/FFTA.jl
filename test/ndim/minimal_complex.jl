@@ -2,8 +2,8 @@ using FFTA, Test
 
 @testset "Basic ND checks" begin
     for sz in ((3, 5, 7), (4, 14, 9), (103, 5, 13), (26, 33, 35, 4), ntuple(i -> 3, 5))
-        x = ones(sz)
-        @test fft(x) ≈ setindex!(zeros(sz), prod(sz), 1)
+        x = ones(ComplexF64, sz)
+        @test fft(x, Tuple(1:ndims(x))) ≈ setindex!(zeros(sz), prod(sz), 1)
     end
 
     y = zeros((3, 3, 3))
