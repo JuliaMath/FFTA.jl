@@ -30,7 +30,7 @@ end
 @testset "2D plan, ND array. Size: $n" for n in 1:64
     x = randn(n, n + 1, n + 2)
 
-    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+    @testset "against 2D arrays with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
         @test rfft(x, r) == mapslices(rfft, x; dims = r)
     end
 end

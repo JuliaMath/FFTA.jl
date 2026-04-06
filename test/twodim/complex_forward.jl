@@ -26,11 +26,19 @@ end
     end
 end
 
-@testset "2D plan, ND array. Size: $n" for n in 1:64
-    x = randn(ComplexF64, n, n + 1, n + 2)
+@testset "$(N)D plan, $(N+1)D array" for N in 2:3
+    rg = N == 2 ? (1:64) : (1:16)
+    dims_lst = [[1,2], [1,3], [2,3]]
+    if N == 3
+        foreach(v -> push!(v, 4), dims_lst)
+    end
+    @testset "against $(N)D arrays with mapslices, r=$r" for r in dims_lst
+        for n in rg
+            x = randn(ComplexF64, ntuple(i -> n + (i - 1), N + 1))
 
-    @testset "against 1D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
-        @test fft(x, r) == mapslices(fft, x; dims = r)
+            t = Tuple(r)    # test tuple region argument
+            @test fft(x, t) == fft(x, r) == mapslices(fft, x; dims = r)
+        end
     end
 end
 
