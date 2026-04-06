@@ -31,7 +31,7 @@ end
         @test x ≈ irfft(rfft(x,r), size(x,r[1]), r)
     end
 
-    @testset "against 2D array with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
+    @testset "against 2D arrays with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
         y = rfft(x, r)
         @test brfft(y, size(x, r[1]), r) == mapslices(t -> brfft(t, size(x, r[1])), y; dims = r)
     end
