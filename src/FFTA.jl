@@ -10,6 +10,7 @@ using Reexport: @reexport
 @reexport using AbstractFFTs
 
 include("callgraph.jl")
+include("singleton_twiddle.jl")
 include("algos.jl")
 include("plan.jl")
 end

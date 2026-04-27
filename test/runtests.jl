@@ -58,6 +58,9 @@ Random.seed!(1)
             @testset verbose = false "Backward" begin
                 include("onedim/complex_backward.jl")
             end
+            @testset verbose = false "Accuracy" begin
+                include("onedim/accuracy.jl")
+            end
         end
         @testset verbose = true "Real" begin
             @testset verbose = false "Forward" begin
