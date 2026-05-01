@@ -8,8 +8,6 @@ using FFTA, Test, Random, LinearAlgebra
 # still fail comfortably against the pre-fix naive `w *= step`
 # recurrence, which ballooned past ~4000 ULP at N = 16384.
 
-Random.seed!(42)
-
 # (N, max eps ratio) across the power-of-2 ladder. Covers both even
 # powers (= powers of 4, recursion bottoms at N = 4) and odd powers
 # (recursion bottoms at N = 2), which hit different base cases in
@@ -47,8 +45,8 @@ const POWERS_OF_3 = (
 function _worst_relerr(N::Int)
     worst = 0.0
     for seed in 1:5
-        Random.seed!(seed)
-        x64 = randn(ComplexF64, N)
+        rng = Xoshiro(seed)
+        x64 = randn(rng, ComplexF64, N)
         x32 = ComplexF32.(x64)
         y32 = fft(x32)
         y_ref = ComplexF32.(fft(x64))

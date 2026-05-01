@@ -66,12 +66,8 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     Rt = right.type
     Lt = left.type
 
-    w1 = _conj(root.w, d)
     Rtype = real(T)
-    # The composite twiddle at position (j1, k2) is `cispi(dir · 2 j1 k2 / N)`.
-    # Singleton's recurrence advances `wk2 = cispi(dir · 2 j1 k2 / N)` in k2
-    # for fixed j1; (α, β) depend on j1 so we reset them at each outer step.
-    dir = twiddle_direction(w1)
+    dir = Int(d)
     tmp = g.workspace[idx]
 
     if Rt === BLUESTEIN
@@ -90,11 +86,14 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
         end
 
         if j1 > 0
-            αi, βi = singleton_params(dir * Rtype(2 * j1) / Rtype(N))
-            ci, si = one(Rtype), zero(Rtype)
+            # The composite twiddle at position (j1, k2) is `cispi(dir · 2 j1 k2 / N)`.
+            # Singleton's recurrence advances `wk2 = cispi(dir · 2 j1 k2 / N)` in k2
+            # for fixed j1; (α, β) depend on j1 so we reset them at each outer step.
+            zj1 = singleton_params(dir * Rtype(j1) / Rtype(N))
+            wk2 = one(complex(Rtype))
             @inbounds for k2 in 1:N2-1
-                ci, si = singleton_step(ci, si, αi, βi)
-                tmp[R_start_out + k2] *= Complex(ci, si)
+                wk2 = singleton_step(wk2, zj1)
+                tmp[R_start_out + k2] *= wk2
             end
         end
     end
@@ -140,14 +139,14 @@ function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_o
     Rtype = real(T)
     dir = twiddle_direction(w)
     @inbounds for d in 1:N-1
-        t = in[start_in]
-        αk, βk = singleton_params(dir * Rtype(2 * d) / Rtype(N))
-        ck, sk = one(Rtype), zero(Rtype)
+        tmp = in[start_in]
+        zd = singleton_params(dir * Rtype(d) / Rtype(N))
+        wk = one(complex(Rtype))
         @inbounds for k in 1:N-1
-            ck, sk = singleton_step(ck, sk, αk, βk)
-            t += Complex(ck, sk) * in[start_in + k*stride_in]
+            wk = singleton_step(wk, zd)
+            tmp += wk * in[start_in + k*stride_in]
         end
-        out[start_out + d*stride_out] = t
+        out[start_out + d*stride_out] = tmp
     end
 end
 
@@ -162,14 +161,14 @@ function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int
 
     dir = twiddle_direction(w)
     @inbounds for d in 1:halfN
-        t = Complex{T}(in[start_in])
-        αk, βk = singleton_params(dir * T(2 * d) / T(N))
-        ck, sk = one(T), zero(T)
+        tmp = Complex{T}(in[start_in])
+        zd = singleton_params(dir * T(d) / T(N))
+        wk = one(complex(T))
         @inbounds for k in 1:N-1
-            ck, sk = singleton_step(ck, sk, αk, βk)
-            t += Complex{T}(ck, sk) * in[start_in + k*stride_in]
+            wk = singleton_step(wk, zd)
+            tmp += wk * in[start_in + k*stride_in]
         end
-        out[start_out + d*stride_out] = t
+        out[start_out + d*stride_out] = tmp
     end
 end
 
@@ -230,12 +229,13 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     fft_pow2_radix4!(out, in, m, start_out + 3*m*stride_out, stride_out, start_in + 3*stride_in, stride_in*4, w_sub)
 
     # Singleton recurrence for the three running twiddles `w^k`, `w^2k`, `w^3k`.
-    α1, β1 = singleton_params(dir * Rtype(2) / Rtype(N))
-    α2, β2 = singleton_params(dir * Rtype(4) / Rtype(N))
-    α3, β3 = singleton_params(dir * Rtype(6) / Rtype(N))
-    c1, s1 = one(Rtype), zero(Rtype)
-    c2, s2 = one(Rtype), zero(Rtype)
-    c3, s3 = one(Rtype), zero(Rtype)
+    z1 = singleton_params(dir * Rtype(1) / Rtype(N))
+    z2 = singleton_params(dir * Rtype(2) / Rtype(N))
+    z3 = singleton_params(dir * Rtype(3) / Rtype(N))
+
+    wkoe = one(complex(Rtype))
+    wkeo = one(complex(Rtype))
+    wkoo = one(complex(Rtype))
 
     @inbounds for k in 0:m-1
         kee = start_out +  k          * stride_out
@@ -243,9 +243,9 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
         keo = start_out + (k + 2 * m) * stride_out
         koo = start_out + (k + 3 * m) * stride_out
         y_kee, y_koe, y_keo, y_koo = out[kee], out[koe], out[keo], out[koo]
-        t_keo = y_keo * Complex(c2, s2)
-        t_koe = y_koe * Complex(c1, s1)
-        t_koo = y_koo * Complex(c3, s3)
+        t_koe = y_koe * wkoe
+        t_keo = y_keo * wkeo
+        t_koo = y_koo * wkoo
         y_kee_p_y_keo = y_kee + t_keo
         y_kee_m_y_keo = y_kee - t_keo
         t_koe_p_t_koo = t_koe + t_koo
@@ -254,9 +254,9 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
         out[koe] = y_kee_m_y_keo + t_koe_m_t_koo
         out[keo] = y_kee_p_y_keo - t_koe_p_t_koo
         out[koo] = y_kee_m_y_keo - t_koe_m_t_koo
-        c1, s1 = singleton_step(c1, s1, α1, β1)
-        c2, s2 = singleton_step(c2, s2, α2, β2)
-        c3, s3 = singleton_step(c3, s3, α3, β3)
+        wkoe = singleton_step(wkoe, z1)
+        wkeo = singleton_step(wkeo, z2)
+        wkoo = singleton_step(wkoo, z3)
     end
 end
 
@@ -300,22 +300,20 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, w_sub, minus120)
     fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w_sub, minus120)
 
-    α1, β1 = singleton_params(dir * Rtype(2) / Rtype(N))
-    α2, β2 = singleton_params(dir * Rtype(4) / Rtype(N))
-    c1, s1 = one(Rtype), zero(Rtype)
-    c2, s2 = one(Rtype), zero(Rtype)
+    z1 = singleton_params(dir * Rtype(1) / Rtype(N))
+    z2 = singleton_params(dir * Rtype(2) / Rtype(N))
+    wk1 = one(complex(Rtype))
+    wk2 = one(complex(Rtype))
     for k in 0:Nprime-1
         k0 = start_out + stride_out * k
         k1 = start_out + stride_out * (k + Nprime)
         k2 = start_out + stride_out * (k + 2 * Nprime)
         y_k0, y_k1, y_k2 = out[k0], out[k1], out[k2]
-        wk1 = Complex(c1, s1)
-        wk2 = Complex(c2, s2)
-        @muladd out[k0] = y_k0 + y_k1*wk1 + y_k2*wk2
-        @muladd out[k1] = y_k0 + y_k1*wk1*plus120 + y_k2*wk2*minus120
-        @muladd out[k2] = y_k0 + y_k1*wk1*minus120 + y_k2*wk2*plus120
-        c1, s1 = singleton_step(c1, s1, α1, β1)
-        c2, s2 = singleton_step(c2, s2, α2, β2)
+        @muladd out[k0] = y_k0 + y_k1 * wk1            + y_k2 * wk2
+        @muladd out[k1] = y_k0 + y_k1 * wk1 * plus120  + y_k2 * wk2 * minus120
+        @muladd out[k2] = y_k0 + y_k1 * wk1 * minus120 + y_k2 * wk2 * plus120
+        wk1 = singleton_step(wk1, z1)
+        wk2 = singleton_step(wk2, z2)
     end
 end
 
