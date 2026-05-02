@@ -425,7 +425,8 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
 
         # The w stored in the plan is for m, not n, so probably cheapest to
         # just recompute it instead of taking a square root
-        wj = w = cispi(-T(2) / n)
+        z = singleton_params(-one(T) / n)
+        wj = cispi(-T(2) / n)
 
         # Construct the result by first constructing the elements of the
         # real and imaginary part, followed by the usual radix-2 assembly,
@@ -441,7 +442,7 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
             XY = T(0.5) * (-yj + conj(ymj)) * im
             y[j]     =      XX + wj * XY
             y[m-j+2] = conj(XX - wj * XY)
-            wj *= w
+            wj = singleton_step(wj, z)
         end
         return y
     else
@@ -467,7 +468,11 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
     # See explanation of this approach in the method for the FORWARD transform
     if iseven(n)
         m = n >> 1
-        wj = w = cispi(T(2) / n)
+
+        R = real(T)
+        z = singleton_params(one(R) / n)
+        wj = cispi(R(2) / n)
+
         x_tmp = similar(x, length(x) - 1)
         x_tmp[1] = complex(
             (real(x[1]) + real(x[end])),
@@ -478,7 +483,7 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
             XY = wj * (x[j] - conj(x[m-j+2]))
             x_tmp[j]     =      XX + im * XY
             x_tmp[m-j+2] = conj(XX - im * XY)
-            wj *= w
+            wj = singleton_step(wj, z)
         end
         y_c = complex(p) * x_tmp
         if isbitstype(T)
