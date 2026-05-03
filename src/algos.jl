@@ -129,7 +129,13 @@ Discrete Fourier Transform, O(N^2) algorithm, in place.
 - `w`: The value `cispi(direction_sign(d) * 2 / N)`
 
 """
-function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T) where {T}
+function fft_dft!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    w::T
+) where {T<:Complex}
     tmp = in[start_in]
     @inbounds for j in 1:N-1
         tmp += in[start_in + j*stride_in]
@@ -141,7 +147,7 @@ function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_o
     @inbounds for d in 1:N-1
         tmp = in[start_in]
         zd = singleton_params(dir * Rtype(d) / Rtype(N))
-        wk = one(complex(Rtype))
+        wk = one(T)
         @inbounds for k in 1:N-1
             wk = singleton_step(wk, zd)
             tmp += wk * in[start_in + k*stride_in]
@@ -150,7 +156,13 @@ function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_o
     end
 end
 
-function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::Complex{T}) where {T<:Real}
+function fft_dft!(
+    out::AbstractVector{Complex{T}}, in::AbstractVector{T},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    w::Complex{T}
+) where {T<:Real}
     halfN = N÷2
 
     tmp = Complex{T}(in[start_in])

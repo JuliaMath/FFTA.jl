@@ -18,9 +18,7 @@
 # order of magnitude faster than a fresh `cispi`), and the extra trig
 # (`sincospi(θ/2)`) happens once per kernel call.
 
-# Direction lives in `sign(imag(w))`; when `w` is real (N = 2 or any
-# degenerate case where `imag` rounds to zero) both directions collapse
-# to the same twiddle set so we pick +1.
+# Direction lives in `sign(imag(w))`
 @inline function twiddle_direction(w::Complex{T}) where {T<:Real}
     s = imag(w)
     copysign(one(T), s)
