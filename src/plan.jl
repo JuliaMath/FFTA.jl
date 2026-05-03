@@ -402,14 +402,14 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
     n = p.flen
     if iseven(n)
         # For problems of even size, we solve the rfft problem by splitting the
-        # problem into the even and odd part and solving the simultanously as
+        # problem into the even and odd part and solving them simultaneously as
         # a single (complex) fft of half the size, see equations (6)-(8) of
         # Sorensen, H. V., D. Jones, Michael Heideman, and C. Burrus.
         # "Real-valued fast Fourier transform algorithms."
         # IEEE Transactions on acoustics, speech, and signal processing 35, no. 6 (2003): 849-863.
         if x isa Vector && isbitstype(T)
-            # For a vector of bits, we can just reintepret the bits to get the
-            # approciate representation of even (zero based) elements as the real
+            # For a vector of bits, we can just reinterpret the bits to get the
+            # appropriate representation of even (zero based) elements as the real
             # part and the odd as the complex part
             x_c = reinterpret(Complex{T}, x)
         else
