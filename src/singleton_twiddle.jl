@@ -18,31 +18,28 @@
 # order of magnitude faster than a fresh `cispi`), and the extra trig
 # (`sincospi(θ/2)`) happens once per kernel call.
 
-# Direction lives in `sign(imag(w))`; when `w` is real (N = 2 or any
-# degenerate case where `imag` rounds to zero) both directions collapse
-# to the same twiddle set so we pick +1.
+# Direction lives in `sign(imag(w))`
 @inline function twiddle_direction(w::Complex{T}) where {T<:Real}
     s = imag(w)
-    s > 0 ? one(T) : (s < 0 ? -one(T) : one(T))
+    copysign(one(T), s)
 end
 
 # Recurrence coefficients for stepping by `cispi(freq) = e^(iπ·freq)`.
-# Uses `sincospi(freq/2)` so that `α` and `β` are exact-to-ULP even
+# Uses `sincospi(hfreq)` so that `α` and `β` are exact-to-ULP even
 # for very small frequencies — writing `1 - cos(θ)` directly suffers
 # catastrophic cancellation there.
-@inline function singleton_params(freq::T) where {T<:Real}
-    s_h, c_h = sincospi(freq / 2)
+@inline function singleton_params(hfreq::Real)
+    s_h, c_h = sincospi(-hfreq)
     α = 2 * s_h * s_h
     β = 2 * s_h * c_h
-    (α, β)
+    Complex(α, β)
 end
 
 # Advance `(c, s) = (cos(kθ), sin(kθ))` to `(cos((k+1)θ), sin((k+1)θ))`.
 # Computed as `c - (αc + βs)` rather than `(1-α)c - βs` on purpose:
 # the correction is small so subtracting it from `c` preserves the
 # high-order bits and the recurrence self-heals.
-@inline function singleton_step(c::T, s::T, α::T, β::T) where {T<:Real}
-    c_new = c - muladd(α, c, β * s)
-    s_new = s - muladd(α, s, -(β * c))
-    (c_new, s_new)
+@inline function singleton_step(w::T, z::T) where {T<:Complex}
+    # muladd only reduces instructions, doesn't help precision much
+    w - @fastmath(z * w)
 end
