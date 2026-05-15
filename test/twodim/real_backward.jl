@@ -3,7 +3,7 @@ using FFTA, Test
 @testset "backward. N=$N" for N in [8, 11, 15, 16, 27, 100]
     x = ones(Complex{Float64}, N, N)
     y = brfft(x, 2(N-1))
-    y_ref = 0*y
+    y_ref = zero(y)
     y_ref[1] = N*(2(N-1))
     @test y_ref ≈ y atol=1e-10
 end
