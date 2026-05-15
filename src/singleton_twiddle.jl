@@ -18,14 +18,6 @@
 # order of magnitude faster than a fresh `cispi`), and the extra trig
 # (`sincospi(θ/2)`) happens once per kernel call.
 
-# Direction lives in `sign(imag(w))`; when `w` is real (N = 2 or any
-# degenerate case where `imag` rounds to zero) both directions collapse
-# to the same twiddle set so we pick +1.
-@inline function twiddle_direction(w::Complex{T}) where {T<:Real}
-    s = imag(w)
-    copysign(one(T), s)
-end
-
 # Recurrence coefficients for stepping by `cispi(freq) = e^(iπ·freq)`.
 # Uses `sincospi(hfreq)` so that `α` and `β` are exact-to-ULP even
 # for very small frequencies — writing `1 - cos(θ)` directly suffers

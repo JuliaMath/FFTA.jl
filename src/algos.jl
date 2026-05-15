@@ -2,8 +2,6 @@
     Int(d)
 end
 
-@inline _conj(w::Complex, d::Direction) = ifelse(direction_sign(d) === 1, w, conj(w))
-
 function fft!(
     out::AbstractVector{T}, in::AbstractVector{T},
     start_out::Int, start_in::Int,
@@ -19,15 +17,14 @@ function fft!(
         s_in = root.s_in
         s_out = root.s_out
         N = root.sz
-        w = _conj(root.w, d)
         if t === DFT
-            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, w)
+            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, d)
         elseif t === POW2RADIX4_FFT
-            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, w)
+            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, d)
         elseif t === POW3_FFT
             _m_120 = cispi(T(2) / 3)
             m_120 = d === FFT_FORWARD ? _m_120 : conj(_m_120)
-            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, w, m_120)
+            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, m_120, d)
         elseif t === BLUESTEIN
             fft_bluestein!(out, in, d, N, start_out, s_out, start_in, s_in)
         else
@@ -67,7 +64,7 @@ function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out
     Lt = left.type
 
     Rtype = real(T)
-    dir = Int(d)
+    dir = direction_sign(d)
     tmp = g.workspace[idx]
 
     if Rt === BLUESTEIN
@@ -129,7 +126,13 @@ Discrete Fourier Transform, O(N^2) algorithm, in place.
 - `w`: The value `cispi(direction_sign(d) * 2 / N)`
 
 """
-function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T) where {T}
+function fft_dft!(
+    out::AbstractVector{T}, in::AbstractVector{T},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    d::Direction
+) where {T<:Complex}
     tmp = in[start_in]
     @inbounds for j in 1:N-1
         tmp += in[start_in + j*stride_in]
@@ -137,20 +140,26 @@ function fft_dft!(out::AbstractVector{T}, in::AbstractVector{T}, N::Int, start_o
     out[start_out] = tmp
 
     Rtype = real(T)
-    dir = twiddle_direction(w)
-    @inbounds for d in 1:N-1
+    dir = direction_sign(d)
+    @inbounds for j in 1:N-1
         tmp = in[start_in]
-        zd = singleton_params(dir * Rtype(d) / Rtype(N))
+        zj = singleton_params(dir * Rtype(j) / Rtype(N))
         wk = one(T)
         @inbounds for k in 1:N-1
-            wk = singleton_step(wk, zd)
+            wk = singleton_step(wk, zj)
             tmp += wk * in[start_in + k*stride_in]
         end
-        out[start_out + d*stride_out] = tmp
+        out[start_out + j*stride_out] = tmp
     end
 end
 
-function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::Complex{T}) where {T<:Real}
+function fft_dft!(
+    out::AbstractVector{Complex{T}}, in::AbstractVector{T},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    d::Direction
+) where {T<:Real}
     halfN = N÷2
 
     tmp = Complex{T}(in[start_in])
@@ -159,16 +168,16 @@ function fft_dft!(out::AbstractVector{Complex{T}}, in::AbstractVector{T}, N::Int
     end
     out[start_out] = tmp
 
-    dir = twiddle_direction(w)
-    @inbounds for d in 1:halfN
+    dir = direction_sign(d)
+    @inbounds for j in 1:halfN
         tmp = Complex{T}(in[start_in])
-        zd = singleton_params(dir * T(d) / T(N))
+        zj = singleton_params(dir * T(j) / T(N))
         wk = one(complex(T))
         @inbounds for k in 1:N-1
-            wk = singleton_step(wk, zd)
+            wk = singleton_step(wk, zj)
             tmp += wk * in[start_in + k*stride_in]
         end
-        out[start_out + d*stride_out] = tmp
+        out[start_out + j*stride_out] = tmp
     end
 end
 
@@ -188,7 +197,13 @@ Radix-4 FFT for powers of 2, in place
 - `w`: The value `cispi(direction_sign(d) * 2 / N)`
 
 """
-function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T) where {T, U}
+function fft_pow2_radix4!(
+    out::AbstractVector{T}, in::AbstractVector{U},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    d::Direction
+) where {T<:Complex, U}
     # If N is 2, compute the size two DFT
     @inbounds if N == 2
         out[start_out]              = in[start_in] + in[start_in + stride_in]
@@ -196,8 +211,10 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
         return
     end
 
+    dir = direction_sign(d)
+
     # If N is 4, compute an unrolled radix-2 FFT and return
-    minusi = -sign(imag(w)) * im
+    minusi = -dir * im
     @inbounds if N == 4
         xee = in[start_in]
         xoe = in[start_in +   stride_in]
@@ -217,17 +234,12 @@ function fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int,
     # ...othersize split the problem in four and recur
     m = N ÷ 4
 
+    fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, d)
+    fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, d)
+    fft_pow2_radix4!(out, in, m, start_out + 2*m*stride_out, stride_out, start_in + 2*stride_in, stride_in*4, d)
+    fft_pow2_radix4!(out, in, m, start_out + 3*m*stride_out, stride_out, start_in + 3*stride_in, stride_in*4, d)
+
     Rtype = real(T)
-    dir = twiddle_direction(w)
-    # Recursive sub-problem step `cispi(dir · 2 / m) = w^4`; use `cispi`
-    # directly so the sub-tree gets a < 1 ULP starting phase.
-    w_sub = cispi(dir * Rtype(2) / Rtype(m))
-
-    fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, w_sub)
-    fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, w_sub)
-    fft_pow2_radix4!(out, in, m, start_out + 2*m*stride_out, stride_out, start_in + 2*stride_in, stride_in*4, w_sub)
-    fft_pow2_radix4!(out, in, m, start_out + 3*m*stride_out, stride_out, start_in + 3*stride_in, stride_in*4, w_sub)
-
     # Singleton recurrence for the three running twiddles `w^k`, `w^2k`, `w^3k`.
     z1 = singleton_params(dir * Rtype(1) / Rtype(N))
     z2 = singleton_params(dir * Rtype(2) / Rtype(N))
@@ -278,7 +290,14 @@ Power of 3 FFT, in place
 - `minus120`: Depending on direction, perform either ∓120° rotation
 
 """
-function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_out::Int, stride_out::Int, start_in::Int, stride_in::Int, w::T, minus120::T) where {T, U}
+function fft_pow3!(
+    out::AbstractVector{T}, in::AbstractVector{U},
+    N::Int,
+    start_out::Int, stride_out::Int,
+    start_in::Int, stride_in::Int,
+    minus120::T,
+    d::Direction
+) where {T, U}
     plus120 = conj(minus120)
     if N == 3
         @muladd out[start_out + 0]            = in[start_in] + in[start_in + stride_in]          + in[start_in + 2*stride_in]
@@ -290,15 +309,13 @@ function fft_pow3!(out::AbstractVector{T}, in::AbstractVector{U}, N::Int, start_
     # Size of subproblem
     Nprime = N ÷ 3
 
-    Rtype = real(T)
-    dir = twiddle_direction(w)
-    # Recursive sub-problem step cispi(dir · 2 / Nprime) = w^3.
-    w_sub = cispi(dir * Rtype(2) / Rtype(Nprime))
-
     # Dividing into subproblems
-    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, w_sub, minus120)
-    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, w_sub, minus120)
-    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, w_sub, minus120)
+    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, minus120, d)
+    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, minus120, d)
+    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, minus120, d)
+
+    Rtype = real(T)
+    dir = direction_sign(d)
 
     z1 = singleton_params(dir * Rtype(1) / Rtype(N))
     z2 = singleton_params(dir * Rtype(2) / Rtype(N))
@@ -381,14 +398,13 @@ function fft_bluestein!(
         a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
     end
 
-    w_pad = cispi(T(2) / pad_len)
     # leave b_n vector alone for last step
-    fft_pow2_radix4!(tmp,      a_series, pad_len, 1, 1, 1, 1, w_pad)    # Fa
-    fft_pow2_radix4!(a_series, b_series, pad_len, 1, 1, 1, 1, w_pad)    # Fb
+    fft_pow2_radix4!(tmp,      a_series, pad_len, 1, 1, 1, 1, FFT_BACKWARD)    # Fa
+    fft_pow2_radix4!(a_series, b_series, pad_len, 1, 1, 1, 1, FFT_BACKWARD)    # Fb
 
     tmp .*= a_series
     # convolution theorem ifft
-    fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, conj(w_pad))
+    fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, FFT_FORWARD)
     conv_a_b = a_series
 
     Xk = tmp
