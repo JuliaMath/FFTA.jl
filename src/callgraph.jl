@@ -13,14 +13,13 @@ Node of a call graph
 - `sz`: Size of this FFT
 
 """
-struct CallGraphNode{T}
+struct CallGraphNode
     left::Int
     right::Int
     type::FFTEnum
     sz::Int
     s_in::Int
     s_out::Int
-    w::T
 end
 
 """
@@ -35,7 +34,7 @@ Object representing a graph of FFT Calls
 
 """
 struct CallGraph{T<:Complex}
-    nodes::Vector{CallGraphNode{T}}
+    nodes::Vector{CallGraphNode}
     workspace::Vector{Vector{T}}
     BLUESTEIN_CUTOFF::Int
 end
@@ -71,29 +70,29 @@ Recursively instantiate a set of `CallGraphNode`s
 
 """
 function CallGraphNode!(
-    nodes::Vector{CallGraphNode{T}},
+    nodes::Vector{CallGraphNode},
     N::Int,
     workspace::Vector{Vector{T}},
     BLUESTEIN_CUTOFF::Int,
-    s_in::Int, s_out::Int)::Int where {T}
+    s_in::Int, s_out::Int
+)::Int where {T}
     if N <= 0
         throw(DimensionMismatch("Array length must be strictly positive"))
     end
-    w = cispi(T(2) / N)
     if iseven(N) && ispow2(N)
         # _ispow24(N)
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out, w))
+        push!(nodes, CallGraphNode(0, 0, POW2RADIX4_FFT, N, s_in, s_out))
         return 1
     elseif N % 3 == 0 && nextpow(3, N) == N
         push!(workspace, T[])
-        push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out, w))
+        push!(nodes, CallGraphNode(0, 0, POW3_FFT, N, s_in, s_out))
         return 1
     elseif N == 1 || Primes.isprime(N)
         push!(workspace, T[])
         # use Bluestein's algorithm for big primes
         LEAF_ALG = N < BLUESTEIN_CUTOFF ? DFT : BLUESTEIN
-        push!(nodes, CallGraphNode(0, 0, LEAF_ALG, N, s_in, s_out, w))
+        push!(nodes, CallGraphNode(0, 0, LEAF_ALG, N, s_in, s_out))
         return 1
     end
     fzn = Primes.factor(N)
@@ -113,12 +112,12 @@ function CallGraphNode!(
         end
     end
     N2 = N ÷ N1
-    push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out, w))
+    push!(nodes, CallGraphNode(0, 0, DFT, N, s_in, s_out))
     sz = length(nodes)
     push!(workspace, Vector{T}(undef, N))
     left_len  = CallGraphNode!(nodes, N1, workspace, BLUESTEIN_CUTOFF, N2       , N2 * s_out)
     right_len = CallGraphNode!(nodes, N2, workspace, BLUESTEIN_CUTOFF, N1 * s_in,          1)
-    nodes[sz] = CallGraphNode(1, 1 + left_len, COMPOSITE_FFT, N, s_in, s_out, w)
+    nodes[sz] = CallGraphNode(1, 1 + left_len, COMPOSITE_FFT, N, s_in, s_out)
     return 1 + left_len + right_len
 end
 
@@ -128,7 +127,7 @@ Instantiate a CallGraph from a number `N`
 
 """
 function CallGraph{T}(N::Int, BLUESTEIN_CUTOFF::Int) where {T}
-    nodes = CallGraphNode{T}[]
+    nodes = CallGraphNode[]
     workspace = Vector{Vector{T}}()
     CallGraphNode!(nodes, N, workspace, BLUESTEIN_CUTOFF, 1, 1)
     CallGraph(nodes, workspace, BLUESTEIN_CUTOFF)
