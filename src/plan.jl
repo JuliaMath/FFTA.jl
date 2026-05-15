@@ -14,23 +14,23 @@ struct FFTAPlan_cx{T,N,R<:RegionTypes{N}} <: FFTAPlan{T,N}
 end
 function FFTAPlan_cx{T,N}(
     cg::NTuple{N,CallGraph{T}}, r::R,
-    dir::Direction, pinv::FFTAInvPlan{T,N}
+    dir::Direction
 ) where {T,N,R<:RegionTypes{N}}
-    FFTAPlan_cx{T,N,R}(cg, r, dir, pinv)
+    FFTAPlan_cx{T,N,R}(cg, r, dir, FFTAInvPlan{T,N}())
 end
 
 struct FFTAPlan_re{T,N,R<:RegionTypes{N}} <: FFTAPlan{T,N}
     callgraph::NTuple{N,CallGraph{T}}
     region::R
     dir::Direction
-    pinv::FFTAInvPlan{T,N}
     flen::Int
+    pinv::FFTAInvPlan{T,N}
 end
 function FFTAPlan_re{T,N}(
     cg::NTuple{N,CallGraph{T}}, r::R,
-    dir::Direction, pinv::FFTAInvPlan{T,N}, flen::Int
+    dir::Direction, flen::Int
 ) where {T,N,R<:RegionTypes{N}}
-    FFTAPlan_re{T,N,R}(cg, r, dir, pinv, flen)
+    FFTAPlan_re{T,N,R}(cg, r, dir, flen, FFTAInvPlan{T,N}())
 end
 
 function Base.size(p::FFTAPlan{<:Any,N}, i::Int) where N
@@ -84,19 +84,17 @@ function _plan_fft(
     if M == 1
         R1 = Int(region[1])
         g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,1}()
-        return FFTAPlan_cx{T,1,Int}((g,), R1, dir, pinv)
+        return FFTAPlan_cx{T,1}((g,), R1, dir)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{T}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_cx{T,2}((g1, g2), R2, dir, pinv)
+        return FFTAPlan_cx{T,2}((g1, g2), R2, dir)
     else
         RM = _sort(region)
         return FFTAPlan_cx{T,M}(
             ntuple(i -> CallGraph{T}(size(x, RM[i]), BLUESTEIN_CUTOFF), Val(M)),
-            RM, dir, FFTAInvPlan{T,M}()
+            RM, dir
         )
     end
 end
@@ -115,14 +113,12 @@ function AbstractFFTs.plan_rfft(
         # problems, we just solve the problem as a single complex
         nn = iseven(n) ? n >> 1 : n
         g = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{Complex{T},1}()
-        return FFTAPlan_re{Complex{T},1,Int}((g,), R1, FFT_FORWARD, pinv, n)
+        return FFTAPlan_re{Complex{T},1}((g,), R1, FFT_FORWARD, n)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{Complex{T},2}()
-        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, pinv, size(x, R2[1]))
+        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, size(x, R2[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -142,14 +138,12 @@ function AbstractFFTs.plan_brfft(
         R1 = Int(region[1])
         nn = iseven(len) ? len >> 1 : len
         g = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,1}()
-        return FFTAPlan_re{T,1,Int}((g,), R1, FFT_BACKWARD, pinv, len)
+        return FFTAPlan_re{T,1}((g,), R1, FFT_BACKWARD, len)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, pinv, len)
+        return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
