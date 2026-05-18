@@ -2,7 +2,7 @@
 
 abstract type FFTAPlan{T,N} <: AbstractFFTs.Plan{T} end
 
-struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
+struct FFTAInvPlan{_T,_N} <: FFTAPlan{_T,_N} end
 
 const RegionTypes{N} = Union{Int,AbstractVector{Int},NTuple{N,Int}}
 
