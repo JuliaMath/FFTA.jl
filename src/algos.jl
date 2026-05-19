@@ -129,7 +129,7 @@ Discrete Fourier Transform, O(N^2) algorithm, in place.
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `d`: Direction of the transform
 
 """
 function fft_dft!(
@@ -201,7 +201,7 @@ Radix-4 FFT for powers of 2, in place
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `d`: Direction of the transform
 
 """
 function fft_pow2_radix4!(
@@ -292,9 +292,8 @@ Power of 3 FFT, in place
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
-- `plus120`: Depending on direction, perform either ±120° rotation
 - `minus120`: Depending on direction, perform either ∓120° rotation
+- `d`: Direction of the transform
 
 """
 function fft_pow3!(

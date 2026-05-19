@@ -11,6 +11,8 @@ Node of a call graph
 - `right`: Offset to the right child node
 - `type`: Object representing the type of FFT
 - `sz`: Size of this FFT
+- `s_in`: The stride of the input
+- `s_out`: The stride of the output
 
 """
 struct CallGraphNode
@@ -65,6 +67,8 @@ Recursively instantiate a set of `CallGraphNode`s
 - `nodes`: A vector (which gets expanded) of `CallGraphNode`s
 - `N`: The size of the FFT
 - `workspace`: A vector (which gets expanded) of preallocated workspaces
+- `BLUESTEIN_CUTOFF`: Minimum prime that will be FFTed with the
+    Bluestein algorithm, below which the O(N^2) DFT is used.
 - `s_in`: The stride of the input
 - `s_out`: The stride of the output
 
