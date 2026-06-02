@@ -72,8 +72,8 @@ end
         yc3 = randn(ComplexF64, 5, 5, 5)
         pxc3 = plan_fft(xc3)
         @test_throws DimensionMismatch pxc3 * yc3
-        invalid_p = plan_fft(randn(ComplexF64, ntuple(i -> 3, 5)), 3:5)
-        xc4 = randn(ComplexF64, (1, ntuple(i -> 5, 3)...))
+        invalid_p = plan_fft(randn(ComplexF64, ntuple(_ -> 3, 5)), 3:5)
+        xc4 = randn(ComplexF64, (1, ntuple(_ -> 5, 3)...))
 
         ### plan region out of bounds
 
@@ -93,7 +93,7 @@ end
     end
 
     @testset "$(N)D array" for N in 2:4
-        xN = randn(ComplexF64, ntuple(i -> 3, N))
+        xN = randn(ComplexF64, ntuple(_ -> 3, N))
         yN = similar(xN, size(xN) .+ 1)
 
         @testset "1D plan, region=$(region)" for region in 1:N
@@ -130,7 +130,7 @@ end
 @testset "Invalid / mutated dims" verbose=true begin
     @testset "Extra elements" begin
         for n in 3:5
-            x = rand(ComplexF64, ntuple(i -> 2, n))
+            x = rand(ComplexF64, ntuple(_ -> 2, n))
             p1 = plan_fft(x, [1:n-1;])
             push!(p1.region, n)
             @test_throws DimensionMismatch("Region is invalid.") p1 * x
@@ -138,7 +138,7 @@ end
     end
     @testset "Unsorted dims" begin
         for n in 3:5
-            x = rand(ComplexF64, ntuple(i -> 2, n))
+            x = rand(ComplexF64, ntuple(_ -> 2, n))
             p2 = plan_fft(x, [1:n-1;])
             p2.region[1:2] = [2, 1]
             @test_throws DimensionMismatch("Region is invalid.") p2 * x

@@ -3,7 +3,7 @@ using FFTA, Test
 @testset " forward. N=$N" for N in [8, 11, 15, 16, 27, 100]
     x = ones(ComplexF64, N, N)
     y = fft(x)
-    y_ref = 0*y
+    y_ref = zero(y)
     y_ref[1] = length(x)
     @test y ≈ y_ref
     x = randn(N,N)
@@ -14,7 +14,7 @@ end
 
 @testset "2D plan, 2D array. Size: $n" for n in 1:64
     @testset "size: ($m, $n)" for m in n:(n + 1)
-        X = complex.(randn(m, n), randn(m, n))
+        X = randn(ComplexF64, (m, n))
 
         @testset "against naive implementation" begin
             @test naive_2d_fourier_transform(X, FFTA.FFT_FORWARD) ≈ fft(X)

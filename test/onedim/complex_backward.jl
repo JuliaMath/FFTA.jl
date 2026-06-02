@@ -33,5 +33,5 @@ end
 end
 
 @testset "error messages" begin
-    @test_throws DimensionMismatch bfft(complex.(zeros(0)))
+    @test_throws DimensionMismatch bfft(ComplexF64[])
 end

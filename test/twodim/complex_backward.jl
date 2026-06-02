@@ -3,7 +3,7 @@ using FFTA, Test
 @testset "backward. N=$N" for N in [8, 11, 15, 16, 27, 100]
     x = ones(ComplexF64, N, N)
     y = bfft(x)
-    y_ref = 0*y
+    y_ref = zero(y)
     y_ref[1] = length(x)
     @test y ≈ y_ref
 end
