@@ -19,9 +19,9 @@ end
     end
 
     @testset "temporarily test real dft separately until used by rfft" begin
-        y_dft = similar(y)
+        y_dft = similar(y, n)
         FFTA.fft_dft!(y_dft, x, n, 1, 1, 1, 1, FFTA.FFT_FORWARD)
-        @test y ≈ y_dft
+        @test y ≈ y_dft[1:length(y)]
     end
 
     @testset "allocation regression" begin

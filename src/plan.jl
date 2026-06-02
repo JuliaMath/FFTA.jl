@@ -394,6 +394,7 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
     Base.require_one_based_indexing(x)
 
     n = p.flen
+    p_c = complex(p)
     if iseven(n)
         # For problems of even size, we solve the rfft problem by splitting the
         # problem into the even and odd part and solving them simultaneously as
@@ -415,7 +416,7 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
         # Allocate complex result vector of half the input size plus one
         y = similar(x_c, m + 1)
         # Solve the complex fft of half the size
-        LinearAlgebra.mul!(view(y, 1:m), complex(p), x_c)
+        LinearAlgebra.mul!(view(y, 1:m), p_c, x_c)
 
         # The w stored in the plan is for m, not n, so probably cheapest to
         # just recompute it instead of taking a square root
@@ -443,10 +444,11 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
         # when the problem cannot be split in two equal size chunks we
         # convert the problem to a complex fft and truncate the redundant
         # part of the result vector
-        x_c = similar(x, Complex{T})
-        y = similar(x_c)
-        copyto!(x_c, x)
-        LinearAlgebra.mul!(y, complex(p), x_c)
+        if size(p_c) != size(x)
+            throw(DimensionMismatch("plan and input array axes do not match"))
+        end
+        y = similar(x, Complex{T})
+        fft!(y, x, 1, 1, p_c.dir, p_c.callgraph[1][1].type, p_c.callgraph[1], 1)
         return y[1:end÷2+1]
     end
 end
@@ -459,6 +461,7 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
     Base.require_one_based_indexing(x)
 
     n = p.flen
+    p_c = complex(p)
     # See explanation of this approach in the method for the FORWARD transform
     if iseven(n)
         m = n >> 1
@@ -479,18 +482,23 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
             x_tmp[m-j+2] = conj(XX - im * XY)
             wj = singleton_step(wj, z1)
         end
-        y_c = complex(p) * x_tmp
+
+        y_c = p_c * x_tmp
         if isbitstype(T)
-            return copy(reinterpret(real(T), y_c))
+            return copy(reinterpret(R, y_c))
         else
-            return mapreduce(t -> [real(t); imag(t)], vcat, y_c)
+            y_re = similar(y_c, R, 2 * length(y_c))
+            for i in eachindex(y_c)
+                y_re[2i-1], y_re[2i] = reim(y_c[i])
+            end
+            return y_re
         end
     else
         x_tmp = similar(x, n)
         x_tmp[1:end÷2+1] .= x
-        x_tmp[end÷2+2:end] .= iseven(n) ? conj.(x[end-1:-1:2]) : conj.(x[end:-1:2])
+        x_tmp[end÷2+2:end] .= @views conj.(x[end-iseven(n):-1:2])
         y = similar(x_tmp)
-        LinearAlgebra.mul!(y, complex(p), x_tmp)
+        LinearAlgebra.mul!(y, p_c, x_tmp)
         return real(y)
     end
 end

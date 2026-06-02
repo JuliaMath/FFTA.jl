@@ -3,13 +3,13 @@
 end
 
 function fft!(
-    out::AbstractVector{T}, in::AbstractVector{T},
+    out::AbstractVector{T}, in::AbstractVector{<:Number},
     start_out::Int, start_in::Int,
     d::Direction,
     t::FFTEnum,
     g::CallGraph{T},
     idx::Int
-    ) where T
+) where T
     if t === COMPOSITE_FFT
         fft_composite!(out, in, start_out, start_in, d, g, idx)
     else
@@ -48,7 +48,13 @@ Cooley-Tukey composite FFT, with a pre-computed call graph
 - `idx`: Index of the current transform in the call graph
 
 """
-function fft_composite!(out::AbstractVector{T}, in::AbstractVector{U}, start_out::Int, start_in::Int, d::Direction, g::CallGraph{T}, idx::Int) where {T,U}
+function fft_composite!(
+    out::AbstractVector{T}, in::AbstractVector{U},
+    start_out::Int, start_in::Int,
+    d::Direction,
+    g::CallGraph{T},
+    idx::Int
+) where {T,U}
     root = g[idx]
     left_idx = idx + root.left
     right_idx = idx + root.right
@@ -123,7 +129,7 @@ Discrete Fourier Transform, O(N^2) algorithm, in place.
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `d`: Direction of the transform
 
 """
 function fft_dft!(
@@ -172,12 +178,13 @@ function fft_dft!(
     @inbounds for j in 1:halfN
         tmp = Complex{T}(in[start_in])
         zj = singleton_params(dir * T(j) / T(N))
-        wk = one(complex(T))
+        wk = one(Complex{T})
         @inbounds for k in 1:N-1
             wk = singleton_step(wk, zj)
             tmp += wk * in[start_in + k*stride_in]
         end
         out[start_out + j*stride_out] = tmp
+        out[start_out + (N-j)*stride_out] = conj(tmp)
     end
 end
 
@@ -194,7 +201,7 @@ Radix-4 FFT for powers of 2, in place
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `d`: Direction of the transform
 
 """
 function fft_pow2_radix4!(
@@ -285,9 +292,8 @@ Power of 3 FFT, in place
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
-- `plus120`: Depending on direction, perform either ±120° rotation
 - `minus120`: Depending on direction, perform either ∓120° rotation
+- `d`: Direction of the transform
 
 """
 function fft_pow3!(
@@ -377,17 +383,17 @@ with a power 2 FFT.
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `w`: The value `cispi(direction_sign(d) * 2 / N)`
+- `scratch` (optional): preallocated scratch space for bluestein
 
 """
 function fft_bluestein!(
-    out::AbstractVector{T}, in::AbstractVector{T},
+    out::AbstractVector{T}, in::AbstractVector{<:Number},
     d::Direction,
     N::Int,
     start_out::Int, stride_out::Int,
     start_in::Int,  stride_in::Int,
     scratch::Tuple{Vector{T},Vector{T},Vector{T},Int}=prealloc_blue(N, d, T)
-) where T<:Number
+) where T<:Complex
 
     (tmp, a_series, b_series, pad_len) = scratch
 
