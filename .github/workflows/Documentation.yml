@@ -6,6 +6,11 @@ on:
   pull_request:
 jobs:
   build:
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+      statuses: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -27,7 +32,7 @@ jobs:
 
       - name: Download benchmark results from CI (if no local results)
         if: steps.check_local.outputs.has_local != 'true'
-        uses: dawidd6/action-download-artifact@v19
+        uses: dawidd6/action-download-artifact@v21
         with:
           workflow: benchmarks.yml
           name_is_regexp: true
@@ -74,16 +79,19 @@ jobs:
             echo "⚠️ No benchmark report found - docs will show placeholder"
           fi
 
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/setup-julia@v3
         with:
-          version: '1.9'
+          version: '1'
 
       - name: Install dependencies
         shell: julia --color=yes --project=docs {0}
-        run: using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()
+        run: |
+          using Pkg
+          Pkg.develop(PackageSpec(path=pwd()))
+          Pkg.instantiate()
 
       - name: Build and deploy
+        run: julia --color=yes --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-        run: julia --color=yes --project=docs/ docs/make.jl
