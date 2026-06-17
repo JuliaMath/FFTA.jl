@@ -2,7 +2,7 @@
 
 abstract type FFTAPlan{T,N} <: AbstractFFTs.Plan{T} end
 
-struct FFTAInvPlan{T,N} <: FFTAPlan{T,N} end
+struct FFTAInvPlan{_T,_N} <: FFTAPlan{_T,_N} end
 
 const RegionTypes{N} = Union{Int,AbstractVector{Int},NTuple{N,Int}}
 
@@ -14,23 +14,23 @@ struct FFTAPlan_cx{T,N,R<:RegionTypes{N}} <: FFTAPlan{T,N}
 end
 function FFTAPlan_cx{T,N}(
     cg::NTuple{N,CallGraph{T}}, r::R,
-    dir::Direction, pinv::FFTAInvPlan{T,N}
+    dir::Direction
 ) where {T,N,R<:RegionTypes{N}}
-    FFTAPlan_cx{T,N,R}(cg, r, dir, pinv)
+    FFTAPlan_cx{T,N,R}(cg, r, dir, FFTAInvPlan{T,N}())
 end
 
 struct FFTAPlan_re{T,N,R<:RegionTypes{N}} <: FFTAPlan{T,N}
     callgraph::NTuple{N,CallGraph{T}}
     region::R
     dir::Direction
-    pinv::FFTAInvPlan{T,N}
     flen::Int
+    pinv::FFTAInvPlan{T,N}
 end
 function FFTAPlan_re{T,N}(
     cg::NTuple{N,CallGraph{T}}, r::R,
-    dir::Direction, pinv::FFTAInvPlan{T,N}, flen::Int
+    dir::Direction, flen::Int
 ) where {T,N,R<:RegionTypes{N}}
-    FFTAPlan_re{T,N,R}(cg, r, dir, pinv, flen)
+    FFTAPlan_re{T,N,R}(cg, r, dir, flen, FFTAInvPlan{T,N}())
 end
 
 function Base.size(p::FFTAPlan{<:Any,N}, i::Int) where N
@@ -84,19 +84,17 @@ function _plan_fft(
     if M == 1
         R1 = Int(region[1])
         g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,1}()
-        return FFTAPlan_cx{T,1,Int}((g,), R1, dir, pinv)
+        return FFTAPlan_cx{T,1}((g,), R1, dir)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{T}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_cx{T,2}((g1, g2), R2, dir, pinv)
+        return FFTAPlan_cx{T,2}((g1, g2), R2, dir)
     else
         RM = _sort(region)
         return FFTAPlan_cx{T,M}(
             ntuple(i -> CallGraph{T}(size(x, RM[i]), BLUESTEIN_CUTOFF), Val(M)),
-            RM, dir, FFTAInvPlan{T,M}()
+            RM, dir
         )
     end
 end
@@ -115,14 +113,12 @@ function AbstractFFTs.plan_rfft(
         # problems, we just solve the problem as a single complex
         nn = iseven(n) ? n >> 1 : n
         g = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{Complex{T},1}()
-        return FFTAPlan_re{Complex{T},1,Int}((g,), R1, FFT_FORWARD, pinv, n)
+        return FFTAPlan_re{Complex{T},1}((g,), R1, FFT_FORWARD, n)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF)
         g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{Complex{T},2}()
-        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, pinv, size(x, R2[1]))
+        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, size(x, R2[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -142,14 +138,12 @@ function AbstractFFTs.plan_brfft(
         R1 = Int(region[1])
         nn = iseven(len) ? len >> 1 : len
         g = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,1}()
-        return FFTAPlan_re{T,1,Int}((g,), R1, FFT_BACKWARD, pinv, len)
+        return FFTAPlan_re{T,1}((g,), R1, FFT_BACKWARD, len)
     elseif M == 2
         R2 = _sort(region)
         g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        pinv = FFTAInvPlan{T,2}()
-        return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, pinv, len)
+        return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
@@ -400,16 +394,17 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
     Base.require_one_based_indexing(x)
 
     n = p.flen
+    p_c = complex(p)
     if iseven(n)
         # For problems of even size, we solve the rfft problem by splitting the
-        # problem into the even and odd part and solving the simultanously as
+        # problem into the even and odd part and solving them simultaneously as
         # a single (complex) fft of half the size, see equations (6)-(8) of
         # Sorensen, H. V., D. Jones, Michael Heideman, and C. Burrus.
         # "Real-valued fast Fourier transform algorithms."
         # IEEE Transactions on acoustics, speech, and signal processing 35, no. 6 (2003): 849-863.
         if x isa Vector && isbitstype(T)
-            # For a vector of bits, we can just reintepret the bits to get the
-            # approciate representation of even (zero based) elements as the real
+            # For a vector of bits, we can just reinterpret the bits to get the
+            # appropriate representation of even (zero based) elements as the real
             # part and the odd as the complex part
             x_c = reinterpret(Complex{T}, x)
         else
@@ -421,11 +416,12 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
         # Allocate complex result vector of half the input size plus one
         y = similar(x_c, m + 1)
         # Solve the complex fft of half the size
-        LinearAlgebra.mul!(view(y, 1:m), complex(p), x_c)
+        LinearAlgebra.mul!(view(y, 1:m), p_c, x_c)
 
         # The w stored in the plan is for m, not n, so probably cheapest to
         # just recompute it instead of taking a square root
-        wj = w = cispi(-T(2) / n)
+        z1 = singleton_params(-one(T) / n)
+        wj = cispi(-T(2) / n)
 
         # Construct the result by first constructing the elements of the
         # real and imaginary part, followed by the usual radix-2 assembly,
@@ -441,17 +437,18 @@ function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:R
             XY = T(0.5) * (-yj + conj(ymj)) * im
             y[j]     =      XX + wj * XY
             y[m-j+2] = conj(XX - wj * XY)
-            wj *= w
+            wj = singleton_step(wj, z1)
         end
         return y
     else
         # when the problem cannot be split in two equal size chunks we
         # convert the problem to a complex fft and truncate the redundant
         # part of the result vector
-        x_c = similar(x, Complex{T})
-        y = similar(x_c)
-        copyto!(x_c, x)
-        LinearAlgebra.mul!(y, complex(p), x_c)
+        if size(p_c) != size(x)
+            throw(DimensionMismatch("plan and input array axes do not match"))
+        end
+        y = similar(x, Complex{T})
+        fft!(y, x, 1, 1, p_c.dir, p_c.callgraph[1][1].type, p_c.callgraph[1], 1)
         return y[1:end÷2+1]
     end
 end
@@ -464,10 +461,15 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
     Base.require_one_based_indexing(x)
 
     n = p.flen
+    p_c = complex(p)
     # See explanation of this approach in the method for the FORWARD transform
     if iseven(n)
         m = n >> 1
-        wj = w = cispi(T(2) / n)
+
+        R = real(T)
+        z1 = singleton_params(one(R) / n)
+        wj = cispi(R(2) / n)
+
         x_tmp = similar(x, length(x) - 1)
         x_tmp[1] = complex(
             (real(x[1]) + real(x[end])),
@@ -478,20 +480,25 @@ function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
             XY = wj * (x[j] - conj(x[m-j+2]))
             x_tmp[j]     =      XX + im * XY
             x_tmp[m-j+2] = conj(XX - im * XY)
-            wj *= w
+            wj = singleton_step(wj, z1)
         end
-        y_c = complex(p) * x_tmp
+
+        y_c = p_c * x_tmp
         if isbitstype(T)
-            return copy(reinterpret(real(T), y_c))
+            return copy(reinterpret(R, y_c))
         else
-            return mapreduce(t -> [real(t); imag(t)], vcat, y_c)
+            y_re = similar(y_c, R, 2 * length(y_c))
+            for i in eachindex(y_c)
+                y_re[2i-1], y_re[2i] = reim(y_c[i])
+            end
+            return y_re
         end
     else
         x_tmp = similar(x, n)
         x_tmp[1:end÷2+1] .= x
-        x_tmp[end÷2+2:end] .= iseven(n) ? conj.(x[end-1:-1:2]) : conj.(x[end:-1:2])
+        x_tmp[end÷2+2:end] .= @views conj.(x[end-iseven(n):-1:2])
         y = similar(x_tmp)
-        LinearAlgebra.mul!(y, complex(p), x_tmp)
+        LinearAlgebra.mul!(y, p_c, x_tmp)
         return real(y)
     end
 end

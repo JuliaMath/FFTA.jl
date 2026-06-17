@@ -1,8 +1,7 @@
 using Test, FFTA
 
-x = randn(2*3*4*5)
-
-@testset "element type: $T" for T in  (Float16, BigFloat)
+@testset "element type: $T" for T in (Float16, BigFloat)
+    x = randn(2*3*4*5)
     Tx = T.(x)
 
     @testset "AbstractFFTs believes that single and double precision is everything." begin
