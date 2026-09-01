@@ -1,14 +1,80 @@
 # FFTA.jl Performance Benchmarks
 
-This directory contains a comprehensive benchmark suite to compare the performance of FFTA.jl against FFTW.jl.
+This directory contains two benchmark suites comparing FFTA.jl against FFTW.jl:
+
+1. **`suite.jl` + `report.jl`** — a comprehensive sweep (1D/2D/3D, batched
+   `dims`, `Float32`/`Float64`, complex and real, plan vs. execution time,
+   allocations, FFTW threading) that renders a markdown report with tables
+   and SVG ratio plots. See [Comprehensive suite](#comprehensive-suite) below.
+2. **`run_benchmarks.jl`** — the original 1D `fft`/`rfft` sweep that produces
+   the interactive HTML report used by the documentation and CI.
+
+## Comprehensive suite
+
+```bash
+cd benchmark
+julia --project=. -t 8 suite.jl              # ~45 min; writes results_suite.json
+julia --project=. report.jl results_suite.json   # writes REPORT.md + plots/*.svg
+```
+
+Options for `suite.jl`:
+
+| flag | meaning |
+|:--|:--|
+| `--quick` | small sizes (≤ 2^16) and short time budget, for smoke testing |
+| `--maxlog2 K` | largest 1D size 2^K (default 22) |
+| `--seconds S` | time budget per measurement (default 0.5) |
+| `--only 1d,nd,batched,threads` | run a subset of the sections |
+| `--kinds fft,rfft` | run only complex (`fft`) or only real (`rfft`) cases |
+| `--sizes 23,29,31` | restrict the 1D sweep to these sizes (to add rows to an existing run) |
+| `--out FILE` | output JSON (default `results_suite.json`) |
+
+`-t N` controls the thread count used for the FFTW-threading section (FFTA
+is single-threaded). `report.jl` accepts several JSON files and merges them.
+
+`report.jl` regenerates the whole `REPORT.md`; sections added by hand (cross
+references to other runs) have to be re-added after re-rendering.
+
+To compare two runs (e.g. before and after a change to FFTA):
+
+```bash
+julia --project=. compare.jl before.json after.json      # prints a markdown table
+```
+
+The suite loads FFTA and FFTW into the **same process** and reaches FFTA's
+`plan_*` methods with `invoke`, because FFTW's methods on `StridedArray` are
+more specific and would otherwise be selected. This also allows every FFTA
+result to be checked against FFTW (the `rel. err` column of the report). The
+timing loop is a small custom one (minimum over samples within a time budget)
+rather than `@benchmark`, because BenchmarkTools' per-call-site compilation
+dominates a sweep of several hundred cases.
+
+What is measured per case:
+
+* **exec** — planned execution (`mul!(y, p, x)`; FFTA real plans only support
+  `p * x`, which includes output allocation)
+* **plan** — plan construction (FFTW with `FFTW.ESTIMATE`; a `FFTW.MEASURE`
+  column is included for 1D power-of-two `ComplexF64`)
+* **cold** — plan + execute, i.e. the one-shot `fft(x)` path
+* **alloc** — bytes allocated by one planned execution
+* **rel. err** — ‖y_FFTA − y_FFTW‖ / ‖y_FFTW‖
+
+The committed [`REPORT.md`](REPORT.md) was produced on the machine described
+in its *Environment* section; re-run the suite to obtain numbers for your own
+hardware.
+
+## Original 1D suite (`run_benchmarks.jl`)
 
 ## Structure
 
 ```
 benchmark/
-├── run_benchmarks.jl          # Main script to run all benchmarks
+├── suite.jl                   # Comprehensive FFTA-vs-FFTW sweep (see above)
+├── report.jl                  # Renders REPORT.md + plots/ from suite.jl output
+├── REPORT.md, plots/          # Committed results of the comprehensive suite
+├── run_benchmarks.jl          # Main script to run the original 1D benchmarks
 ├── generate_html_report.jl    # Script to generate HTML report with Plotly.js
-├── Project.toml               # Dependencies (JSON, Dates)
+├── Project.toml               # Dependencies (FFTW, BenchmarkTools, JSON, ...)
 ├── ffta_env/                  # Isolated environment for FFTA
 │   ├── bench_ffta.jl         # FFTA benchmark script
 │   └── Project.toml          # FFTA dependencies
