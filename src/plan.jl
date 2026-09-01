@@ -83,17 +83,17 @@ function _plan_fft(
     M = length(region)
     if M == 1
         R1 = Int(region[1])
-        g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF)
+        g = CallGraph{T}(size(x, R1), BLUESTEIN_CUTOFF, dir)
         return FFTAPlan_cx{T,1}((g,), R1, dir)
     elseif M == 2
         R2 = _sort(region)
-        g1 = CallGraph{T}(size(x, R2[1]), BLUESTEIN_CUTOFF)
-        g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
+        g1 = CallGraph{T}(size(x, R2[1]), BLUESTEIN_CUTOFF, dir)
+        g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF, dir)
         return FFTAPlan_cx{T,2}((g1, g2), R2, dir)
     else
         RM = _sort(region)
         return FFTAPlan_cx{T,M}(
-            ntuple(i -> CallGraph{T}(size(x, RM[i]), BLUESTEIN_CUTOFF), Val(M)),
+            ntuple(i -> CallGraph{T}(size(x, RM[i]), BLUESTEIN_CUTOFF, dir), Val(M)),
             RM, dir
         )
     end
@@ -112,12 +112,12 @@ function AbstractFFTs.plan_rfft(
         # two n/2 complex FFTs followed by a butterfly. For odd size
         # problems, we just solve the problem as a single complex
         nn = iseven(n) ? n >> 1 : n
-        g = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF)
+        g = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF, FFT_FORWARD)
         return FFTAPlan_re{Complex{T},1}((g,), R1, FFT_FORWARD, n)
     elseif M == 2
         R2 = _sort(region)
-        g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF)
-        g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF)
+        g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF, FFT_FORWARD)
+        g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF, FFT_FORWARD)
         return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, size(x, R2[1]))
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
@@ -137,12 +137,12 @@ function AbstractFFTs.plan_brfft(
         # problems, we just solve the problem as a single complex
         R1 = Int(region[1])
         nn = iseven(len) ? len >> 1 : len
-        g = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
+        g = CallGraph{T}(nn, BLUESTEIN_CUTOFF, FFT_BACKWARD)
         return FFTAPlan_re{T,1}((g,), R1, FFT_BACKWARD, len)
     elseif M == 2
         R2 = _sort(region)
-        g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
-        g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
+        g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF, FFT_BACKWARD)
+        g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF, FFT_BACKWARD)
         return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, len)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
