@@ -46,6 +46,7 @@ Random.seed!(1)
     @testset verbose = true "QA" begin
         include("qa/aqua.jl")
         include("qa/explicit_imports.jl")
+        include("qa/fftw_coexistence.jl")
     end
     @testset verbose = true "Argument checking" begin
         include("argument_checking.jl")
@@ -88,6 +89,15 @@ Random.seed!(1)
                 include("twodim/real_backward.jl")
             end
         end
+    end
+    @testset verbose = true "Real plans: mul!" begin
+        include("real_mul.jl")
+    end
+    @testset verbose = true "Inverse and in-place plans" begin
+        include("inverse_inplace.jl")
+    end
+    @testset verbose = true "Workers and threads" begin
+        include("threads.jl")
     end
     @testset verbose = true "N-D" begin
         @testset verbose = true "Minimal tests" begin

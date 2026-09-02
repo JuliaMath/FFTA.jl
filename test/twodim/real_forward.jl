@@ -22,7 +22,7 @@ end
         end
 
         @testset "allocations" begin
-            @test (@test_allocations rfft(X)) <= 132
+            @test (@test_allocations rfft(X)) <= 132 * Threads.nthreads()
         end
     end
 end
@@ -38,5 +38,5 @@ end
 @testset "allocations" begin
     X = randn(256, 256)
     rfft(X) # compile
-    @test (@test_allocations rfft(X)) <= 63
+    @test (@test_allocations rfft(X)) <= 63 * Threads.nthreads()
 end

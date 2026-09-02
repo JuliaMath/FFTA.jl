@@ -2,7 +2,7 @@
     Int(d)
 end
 
-function fft!(
+function fft_kernel!(
     out::AbstractVector{T}, in::AbstractVector{<:Number},
     start_out::Int, start_in::Int,
     d::Direction,
@@ -85,7 +85,7 @@ function fft_composite!(
             R_s_out = right.s_out
             fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_bluestein_scratchspace)
         else
-            fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
+            fft_kernel!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
         end
 
         if j1 > 0
@@ -112,7 +112,7 @@ function fft_composite!(
             L_s_out = left.s_out
             fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_bluestein_scratchspace)
         else
-            fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
+            fft_kernel!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
         end
     end
 end

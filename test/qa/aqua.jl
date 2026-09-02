@@ -6,6 +6,6 @@ import Aqua
     FFTA;
     # This type piracy is caused by the problematic design of AbstractFFTs.jl
     # Ref https://github.com/JuliaMath/AbstractFFTs.jl/issues/32
-    piracies = (; treat_as_own = [plan_bfft, plan_brfft, plan_fft, plan_rfft]),
+    piracies = (; treat_as_own = [plan_bfft, plan_brfft, plan_fft, plan_rfft, plan_fft!, plan_bfft!]),
   )
 end
