@@ -99,7 +99,22 @@ function _plan_fft(
     end
 end
 
-function AbstractFFTs.plan_rfft(
+# The `AbstractFFTs` entry points deliberately leave `region` unannotated: an
+# annotation such as `region::RegionTypes` makes these methods ambiguous with
+# FFTW.jl's `plan_rfft(::StridedArray{Float64}, region)` when both packages
+# are loaded (neither is more specific in every argument), which turns
+# `rfft(x)` into a `MethodError`. With the annotation on the array only,
+# FFTW's methods are strictly more specific and win, as AbstractFFTs intends.
+AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...) where {T<:Real,N} =
+    _plan_rfft(x, _region(region); kwargs...)
+
+AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len::Integer, region; kwargs...) where {T,N} =
+    _plan_brfft(x, Int(len), _region(region); kwargs...)
+
+_region(r::RegionTypes) = r
+_region(r) = collect(Int, r)
+
+function _plan_rfft(
     x::AbstractArray{T,N},
     region::RegionTypes;
     BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...
@@ -124,7 +139,7 @@ function AbstractFFTs.plan_rfft(
     end
 end
 
-function AbstractFFTs.plan_brfft(
+function _plan_brfft(
     x::AbstractArray{T,N},
     len::Int,
     region::RegionTypes;
