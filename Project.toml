@@ -15,7 +15,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 [compat]
 AbstractFFTs = "1"
 Aqua = "0.8"
-DocStringExtensions = "0.9"
+DocStringExtensions = "0.9, 0.10"
 ExplicitImports = "1.12"
 LinearAlgebra = "<0.0.1, 1"
 MuladdMacro = "0.2"
