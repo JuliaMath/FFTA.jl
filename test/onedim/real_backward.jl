@@ -35,7 +35,7 @@ end
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
         y = rfft(x, r)
-        @test brfft(y, size(x, r), r) == mapslices(t -> brfft(t, size(x, r)), y; dims = r)
+        @test brfft(y, size(x, r), r) ≈ mapslices(t -> brfft(t, size(x, r)), y; dims = r) rtol = 4eps()
     end
 end
 

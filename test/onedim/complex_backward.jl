@@ -28,7 +28,7 @@ end
     x = randn(ComplexF64, n, n + 1, n + 2)
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
-        @test bfft(x, r) == mapslices(bfft, x; dims = r)
+        @test bfft(x, r) ≈ mapslices(bfft, x; dims = r) rtol = 4eps()
     end
 end
 

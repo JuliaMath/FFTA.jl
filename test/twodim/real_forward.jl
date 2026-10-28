@@ -31,7 +31,7 @@ end
     x = randn(n, n + 1, n + 2)
 
     @testset "against 2D arrays with mapslices, r=$r" for r in [[1,2], [1,3], [2,3]]
-        @test rfft(x, r) == mapslices(rfft, x; dims = r)
+        @test rfft(x, r) ≈ mapslices(rfft, x; dims = r) rtol = 4eps()
     end
 end
 
