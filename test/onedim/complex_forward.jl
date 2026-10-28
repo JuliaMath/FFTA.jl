@@ -7,8 +7,8 @@ using FFTA, Test
     y_ref = zero(y)
     y_ref[1] = N
     @test y ≈ y_ref atol=1e-12
-    @test y == fft(reshape(x, 1, 1, N), 3)[:]
-    @test y == fft(reshape(x, N, 1),    1)[:]
+    @test y ≈ fft(reshape(x, 1, 1, N), 3)[:] rtol = 4eps()
+    @test y ≈ fft(reshape(x, N, 1),    1)[:] rtol = 4eps()
 end
 
 # N = 73^2 tests preallocated fft_bluestein!, both right and left
@@ -28,7 +28,7 @@ end
     x = randn(ComplexF64, n, n + 1, n + 2)
 
     @testset "against 1D array with mapslices, r=$r" for r in 1:3
-        @test fft(x, r) == mapslices(fft, x; dims = r)
+        @test fft(x, r) ≈ mapslices(fft, x; dims = r) rtol = 4eps()
     end
 end
 

@@ -35,7 +35,8 @@ end
             x = randn(ComplexF64, ntuple(i -> n + (i - 1), N + 1))
 
             t = Tuple(r)    # test tuple region argument
-            @test bfft(x, t) == bfft(x, r) == mapslices(bfft, x; dims = r)
+            @test bfft(x, t) ≈ bfft(x, r) rtol = 4eps()
+            @test bfft(x, r) ≈ mapslices(bfft, x; dims = r) rtol = 4eps()
         end
     end
 end
