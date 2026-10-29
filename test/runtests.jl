@@ -47,6 +47,9 @@ Random.seed!(1)
         include("qa/aqua.jl")
         include("qa/explicit_imports.jl")
     end
+    @testset verbose = true "Twiddle tables" begin
+        include("twiddles.jl")
+    end
     @testset verbose = true "Argument checking" begin
         include("argument_checking.jl")
     end
