@@ -1,7 +1,3 @@
-@inline function direction_sign(d::Direction)
-    Int(d)
-end
-
 function fft!(
     out::AbstractVector{T}, in::AbstractVector{<:Number},
     start_out::Int, start_in::Int,
@@ -10,6 +6,9 @@ function fft!(
     g::CallGraph{T},
     idx::Int
 ) where T
+    if d !== g.dir
+        throw(ArgumentError("call graph was planned for direction $(g.dir), not $d"))
+    end
     if t === COMPOSITE_FFT
         fft_composite!(out, in, start_out, start_in, d, g, idx)
     else
@@ -17,16 +16,17 @@ function fft!(
         s_in = root.s_in
         s_out = root.s_out
         N = root.sz
+        tw = g.twiddles[idx]
         if t === DFT
-            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, d)
+            fft_dft!(out, in, N, start_out, s_out, start_in, s_in, tw)
         elseif t === POW2RADIX4_FFT
-            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, d)
+            fft_pow2_radix4!(out, in, N, start_out, s_out, start_in, s_in, d, tw, 0)
         elseif t === POW3_FFT
             _m_120 = cispi(T(2) / 3)
             m_120 = d === FFT_FORWARD ? _m_120 : conj(_m_120)
-            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, m_120, d)
+            fft_pow3!(out, in, N, start_out, s_out, start_in, s_in, m_120, d, tw, 0)
         elseif t === BLUESTEIN
-            fft_bluestein!(out, in, d, N, start_out, s_out, start_in, s_in)
+            fft_bluestein!(out, in, d, N, start_out, s_out, start_in, s_in, g.bluestein[g.blue_index[idx]])
         else
             throw(ArgumentError("kernel not implemented"))
         end
@@ -60,7 +60,6 @@ function fft_composite!(
     right_idx = idx + root.right
     left = g[left_idx]
     right = g[right_idx]
-    N  = root.sz
     N1 = left.sz
     N2 = right.sz
     s_in = root.s_in
@@ -69,51 +68,27 @@ function fft_composite!(
     Rt = right.type
     Lt = left.type
 
-    Rtype = real(T)
-    dir = direction_sign(d)
     tmp = g.workspace[idx]
+    tw = g.twiddles[idx]   # see `composite_twiddles`
 
-    if Rt === BLUESTEIN
-        R_bluestein_scratchspace = prealloc_blue(N2, d, T)
-    end
     for j1 in 0:N1-1
         R_start_in  = start_in + j1 * s_in
         R_start_out = 1 + N2 * j1
 
-        if @isdefined R_bluestein_scratchspace
-            R_s_in  = right.s_in
-            R_s_out = right.s_out
-            fft_bluestein!(tmp, in, d, N2, R_start_out, R_s_out, R_start_in, R_s_in, R_bluestein_scratchspace)
-        else
-            fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
-        end
+        fft!(tmp, in, R_start_out, R_start_in, d, Rt, g, right_idx)
 
         if j1 > 0
-            # The composite twiddle at position (j1, k2) is `cispi(dir · 2 j1 k2 / N)`.
-            # Singleton's recurrence advances `wk2 = cispi(dir · 2 j1 k2 / N)` in k2
-            # for fixed j1; (α, β) depend on j1 so we reset them at each outer step.
-            zj1 = singleton_params(dir * Rtype(j1) / Rtype(N))
-            wk2 = one(T)
+            base = (j1 - 1) * (N2 - 1)
             @inbounds for k2 in 1:N2-1
-                wk2 = singleton_step(wk2, zj1)
-                tmp[R_start_out + k2] *= wk2
+                tmp[R_start_out + k2] *= tw[base + k2]
             end
         end
     end
 
-    if Lt === BLUESTEIN
-        L_bluestein_scratchspace = prealloc_blue(N1, d, T)
-    end
     for k2 in 0:N2-1
         L_start_out = start_out + k2 * s_out
         L_start_in  = 1 + k2
-        if @isdefined L_bluestein_scratchspace
-            L_s_in  = left.s_in
-            L_s_out = left.s_out
-            fft_bluestein!(out, tmp, d, N1, L_start_out, L_s_out, L_start_in, L_s_in, L_bluestein_scratchspace)
-        else
-            fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
-        end
+        fft!(out, tmp, L_start_out, L_start_in, d, Lt, g, left_idx)
     end
 end
 
@@ -129,7 +104,8 @@ Discrete Fourier Transform, O(N^2) algorithm, in place.
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `d`: Direction of the transform
+- `W`: Twiddle table, see `dft_twiddles` (or `d`, the direction, in which
+  case the table is computed on the fly)
 
 """
 function fft_dft!(
@@ -137,25 +113,25 @@ function fft_dft!(
     N::Int,
     start_out::Int, stride_out::Int,
     start_in::Int, stride_in::Int,
-    d::Direction
+    W::AbstractVector{T}
 ) where {T<:Complex}
-    tmp = in[start_in]
-    @inbounds for j in 1:N-1
-        tmp += in[start_in + j*stride_in]
-    end
-    out[start_out] = tmp
-
-    Rtype = real(T)
-    dir = direction_sign(d)
-    @inbounds for j in 1:N-1
+    @inbounds begin
         tmp = in[start_in]
-        zj = singleton_params(dir * Rtype(j) / Rtype(N))
-        wk = one(T)
-        @inbounds for k in 1:N-1
-            wk = singleton_step(wk, zj)
-            tmp += wk * in[start_in + k*stride_in]
+        for j in 1:N-1
+            tmp += in[start_in + j*stride_in]
         end
-        out[start_out + j*stride_out] = tmp
+        out[start_out] = tmp
+
+        for j in 1:N-1
+            tmp = in[start_in]
+            idx = 0   # j * k mod N
+            for k in 1:N-1
+                idx += j
+                idx >= N && (idx -= N)
+                tmp += W[idx + 1] * in[start_in + k*stride_in]
+            end
+            out[start_out + j*stride_out] = tmp
+        end
     end
 end
 
@@ -164,29 +140,34 @@ function fft_dft!(
     N::Int,
     start_out::Int, stride_out::Int,
     start_in::Int, stride_in::Int,
-    d::Direction
+    W::AbstractVector{Complex{T}}
 ) where {T<:Real}
     halfN = N÷2
 
-    tmp = Complex{T}(in[start_in])
-    @inbounds for j in 1:N-1
-        tmp += in[start_in + j*stride_in]
-    end
-    out[start_out] = tmp
-
-    dir = direction_sign(d)
-    @inbounds for j in 1:halfN
+    @inbounds begin
         tmp = Complex{T}(in[start_in])
-        zj = singleton_params(dir * T(j) / T(N))
-        wk = one(Complex{T})
-        @inbounds for k in 1:N-1
-            wk = singleton_step(wk, zj)
-            tmp += wk * in[start_in + k*stride_in]
+        for j in 1:N-1
+            tmp += in[start_in + j*stride_in]
         end
-        out[start_out + j*stride_out] = tmp
-        out[start_out + (N-j)*stride_out] = conj(tmp)
+        out[start_out] = tmp
+
+        for j in 1:halfN
+            tmp = Complex{T}(in[start_in])
+            idx = 0
+            for k in 1:N-1
+                idx += j
+                idx >= N && (idx -= N)
+                tmp += W[idx + 1] * in[start_in + k*stride_in]
+            end
+            out[start_out + j*stride_out] = tmp
+            out[start_out + (N-j)*stride_out] = conj(tmp)
+        end
     end
 end
+
+fft_dft!(out::AbstractVector{T}, in::AbstractVector, N::Int, start_out::Int, stride_out::Int,
+         start_in::Int, stride_in::Int, d::Direction) where {T<:Complex} =
+    fft_dft!(out, in, N, start_out, stride_out, start_in, stride_in, dft_twiddles(T, N, d))
 
 
 """
@@ -202,6 +183,8 @@ Radix-4 FFT for powers of 2, in place
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
 - `d`: Direction of the transform
+- `tw`: Twiddle table, see `pow2_twiddles` (omit it to compute the table on the fly)
+- `toff`: Offset of the current recursion level in `tw`
 
 """
 function fft_pow2_radix4!(
@@ -209,7 +192,8 @@ function fft_pow2_radix4!(
     N::Int,
     start_out::Int, stride_out::Int,
     start_in::Int, stride_in::Int,
-    d::Direction
+    d::Direction,
+    tw::AbstractVector{T}, toff::Int
 ) where {T<:Complex, U}
     # If N is 2, compute the size two DFT
     @inbounds if N == 2
@@ -240,23 +224,17 @@ function fft_pow2_radix4!(
 
     # ...othersize split the problem in four and recur
     m = N ÷ 4
+    toff_next = toff + 3m   # the next level's table follows this level's
 
-    fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, d)
-    fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, d)
-    fft_pow2_radix4!(out, in, m, start_out + 2*m*stride_out, stride_out, start_in + 2*stride_in, stride_in*4, d)
-    fft_pow2_radix4!(out, in, m, start_out + 3*m*stride_out, stride_out, start_in + 3*stride_in, stride_in*4, d)
-
-    Rtype = real(T)
-    # Singleton recurrence for the three running twiddles `w^k`, `w^2k`, `w^3k`.
-    z1 = singleton_params(dir * Rtype(1) / Rtype(N))
-    z2 = singleton_params(dir * Rtype(2) / Rtype(N))
-    z3 = singleton_params(dir * Rtype(3) / Rtype(N))
-
-    wkoe = one(T)
-    wkeo = one(T)
-    wkoo = one(T)
+    fft_pow2_radix4!(out, in, m, start_out                 , stride_out, start_in              , stride_in*4, d, tw, toff_next)
+    fft_pow2_radix4!(out, in, m, start_out +   m*stride_out, stride_out, start_in +   stride_in, stride_in*4, d, tw, toff_next)
+    fft_pow2_radix4!(out, in, m, start_out + 2*m*stride_out, stride_out, start_in + 2*stride_in, stride_in*4, d, tw, toff_next)
+    fft_pow2_radix4!(out, in, m, start_out + 3*m*stride_out, stride_out, start_in + 3*stride_in, stride_in*4, d, tw, toff_next)
 
     @inbounds for k in 0:m-1
+        wkoe = tw[toff + 3k + 1]
+        wkeo = tw[toff + 3k + 2]
+        wkoo = tw[toff + 3k + 3]
         kee = start_out +  k          * stride_out
         koe = start_out + (k +     m) * stride_out
         keo = start_out + (k + 2 * m) * stride_out
@@ -273,11 +251,12 @@ function fft_pow2_radix4!(
         out[koe] = y_kee_m_y_keo + t_koe_m_t_koo
         out[keo] = y_kee_p_y_keo - t_koe_p_t_koo
         out[koo] = y_kee_m_y_keo - t_koe_m_t_koo
-        wkoe = singleton_step(wkoe, z1)
-        wkeo = singleton_step(wkeo, z2)
-        wkoo = singleton_step(wkoo, z3)
     end
 end
+
+fft_pow2_radix4!(out::AbstractVector{T}, in::AbstractVector, N::Int, start_out::Int, stride_out::Int,
+                 start_in::Int, stride_in::Int, d::Direction) where {T<:Complex} =
+    fft_pow2_radix4!(out, in, N, start_out, stride_out, start_in, stride_in, d, pow2_twiddles(T, N, d), 0)
 
 
 """
@@ -294,6 +273,8 @@ Power of 3 FFT, in place
 - `stride_in`: Stride of the input vector
 - `minus120`: Depending on direction, perform either ∓120° rotation
 - `d`: Direction of the transform
+- `tw`: Twiddle table, see `pow3_twiddles` (omit it to compute the table on the fly)
+- `toff`: Offset of the current recursion level in `tw`
 
 """
 function fft_pow3!(
@@ -302,7 +283,8 @@ function fft_pow3!(
     start_out::Int, stride_out::Int,
     start_in::Int, stride_in::Int,
     minus120::T,
-    d::Direction
+    d::Direction,
+    tw::AbstractVector{T}, toff::Int
 ) where {T, U}
     plus120 = conj(minus120)
     if N == 3
@@ -314,20 +296,16 @@ function fft_pow3!(
 
     # Size of subproblem
     Nprime = N ÷ 3
+    toff_next = toff + 2 * Nprime
 
     # Dividing into subproblems
-    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, minus120, d)
-    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, minus120, d)
-    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, minus120, d)
+    fft_pow3!(out, in, Nprime, start_out,                       stride_out, start_in,               stride_in*3, minus120, d, tw, toff_next)
+    fft_pow3!(out, in, Nprime, start_out +   Nprime*stride_out, stride_out, start_in +   stride_in, stride_in*3, minus120, d, tw, toff_next)
+    fft_pow3!(out, in, Nprime, start_out + 2*Nprime*stride_out, stride_out, start_in + 2*stride_in, stride_in*3, minus120, d, tw, toff_next)
 
-    Rtype = real(T)
-    dir = direction_sign(d)
-
-    z1 = singleton_params(dir * Rtype(1) / Rtype(N))
-    z2 = singleton_params(dir * Rtype(2) / Rtype(N))
-    wk1 = one(T)
-    wk2 = one(T)
-    for k in 0:Nprime-1
+    @inbounds for k in 0:Nprime-1
+        wk1 = tw[toff + 2k + 1]
+        wk2 = tw[toff + 2k + 2]
         k0 = start_out + stride_out * k
         k1 = start_out + stride_out * (k + Nprime)
         k2 = start_out + stride_out * (k + 2 * Nprime)
@@ -335,36 +313,13 @@ function fft_pow3!(
         @muladd out[k0] = y_k0 + y_k1 * wk1            + y_k2 * wk2
         @muladd out[k1] = y_k0 + y_k1 * wk1 * plus120  + y_k2 * wk2 * minus120
         @muladd out[k2] = y_k0 + y_k1 * wk1 * minus120 + y_k2 * wk2 * plus120
-        wk1 = singleton_step(wk1, z1)
-        wk2 = singleton_step(wk2, z2)
     end
 end
 
+fft_pow3!(out::AbstractVector{T}, in::AbstractVector, N::Int, start_out::Int, stride_out::Int,
+          start_in::Int, stride_in::Int, minus120::T, d::Direction) where {T} =
+    fft_pow3!(out, in, N, start_out, stride_out, start_in, stride_in, minus120, d, pow3_twiddles(T, N, d), 0)
 
-function prealloc_blue(N::Int, d::Direction, ::Type{T}) where T<:Number
-    pad_len = nextpow(2, 2N - 1)
-
-    b_series = Vector{T}(undef, pad_len)
-    a_series = Vector{T}(undef, pad_len)
-    tmp      = Vector{T}(undef, pad_len)
-
-    b_series[N+1:end] .= zero(T)
-
-    sgn = -direction_sign(d)
-    p = 0   # n^2
-    for i in 1:N
-        b_series[i] = cispi(sgn * p / N)
-        p += (2i - 1)   # prevents overflow unless N is absolutely massive
-        p > N && (p -= 2N)
-    end
-
-    # enforce periodic boundaries for b_n
-    for j in 0:N-1
-        b_series[pad_len-j] = b_series[2+j]
-    end
-
-    return (tmp, a_series, b_series, pad_len)
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -372,7 +327,8 @@ Bluestein's algorithm, still O(N * log(N)) for large primes,
 but with a big constant factor.
 Zero-pads two sequences derived from the DFT formula to a
 power of 2 length greater than `2N-1` and computes their convolution
-with a power 2 FFT.
+with a power 2 FFT. The chirp, its transform and the work arrays are
+precomputed in `scratch` (see `BluesteinScratch`).
 
 # Arguments
 - `out`: Output vector
@@ -383,7 +339,7 @@ with a power 2 FFT.
 - `stride_out`: Stride of the output vector
 - `start_in`: Index of the first element of the input vector
 - `stride_in`: Stride of the input vector
-- `scratch` (optional): preallocated scratch space for bluestein
+- `scratch`: precomputed data and scratch space (omit it to compute it on the fly)
 
 """
 function fft_bluestein!(
@@ -392,33 +348,30 @@ function fft_bluestein!(
     N::Int,
     start_out::Int, stride_out::Int,
     start_in::Int,  stride_in::Int,
-    scratch::Tuple{Vector{T},Vector{T},Vector{T},Int}=prealloc_blue(N, d, T)
+    scratch::BluesteinScratch{T}=BluesteinScratch{T}(N, d)
 ) where T<:Complex
+    (; pad_len, chirp, chirp_fft, a, tmp, tw) = scratch
 
-    (tmp, a_series, b_series, pad_len) = scratch
-
-    a_series[N+1:end] .= zero(T)
-    tmp[N+1:end]      .= zero(T)
-
-    for i in 1:N
-        a_series[i] = in[start_in+(i-1)*stride_in] * conj(b_series[i])
+    # a_n = x_n · conj(b_n), zero padded
+    @inbounds for i in 1:N
+        a[i] = in[start_in + (i-1)*stride_in] * conj(chirp[i])
+    end
+    @inbounds for i in N+1:pad_len
+        a[i] = zero(T)
     end
 
-    # leave b_n vector alone for last step
-    fft_pow2_radix4!(tmp,      a_series, pad_len, 1, 1, 1, 1, FFT_BACKWARD)    # Fa
-    fft_pow2_radix4!(a_series, b_series, pad_len, 1, 1, 1, 1, FFT_BACKWARD)    # Fb
-
-    tmp .*= a_series
-    # convolution theorem ifft
-    fft_pow2_radix4!(a_series, tmp, pad_len, 1, 1, 1, 1, FFT_FORWARD)
-    conv_a_b = a_series
-
-    Xk = tmp
-    for i in 1:N
-        Xk[i] = conj(b_series[i]) * conv_a_b[i] / pad_len
+    # Circular convolution of `a` with the periodised chirp via the forward
+    # transform only: conv = conj(fft(conj(fft(a) .* fft(b)))) / pad_len, with
+    # the 1/pad_len already folded into `chirp_fft`.
+    fft_pow2_radix4!(tmp, a, pad_len, 1, 1, 1, 1, FFT_FORWARD, tw, 0)
+    @inbounds for i in 1:pad_len
+        tmp[i] = conj(tmp[i] * chirp_fft[i])
     end
+    fft_pow2_radix4!(a, tmp, pad_len, 1, 1, 1, 1, FFT_FORWARD, tw, 0)
 
-    out_inds = range(start_out; step=stride_out, length=N)
-    copyto!(out, CartesianIndices((out_inds,)), Xk, CartesianIndices((N,)))
+    # X_k = conj(b_k) · conv_k
+    @inbounds for i in 1:N
+        out[start_out + (i-1)*stride_out] = conj(chirp[i]) * conj(a[i])
+    end
     return nothing
 end
