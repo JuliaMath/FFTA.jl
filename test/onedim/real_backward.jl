@@ -22,6 +22,7 @@ end
     end
 
     @testset "allocation regression" begin
+        brfft(y, n) # warmup
         @test (@test_allocations brfft(y, n)) <= 55
     end
 end

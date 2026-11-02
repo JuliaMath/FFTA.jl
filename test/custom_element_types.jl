@@ -4,9 +4,9 @@ using Test, FFTA
     x = randn(2*3*4*5)
     Tx = T.(x)
 
-    @testset "AbstractFFTs believes that single and double precision is everything." begin
+    @testset "real input is promoted to complex, see #77" begin
         # Ref https://github.com/JuliaMath/FFTA.jl/issues/77
-        @test_broken fft(Tx) isa Vector{Complex{T}}
+        @test fft(Tx) isa Vector{Complex{T}}
     end
 
     # Complex

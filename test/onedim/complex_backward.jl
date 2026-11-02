@@ -20,6 +20,7 @@ end
     end
 
     @testset "allocation regression" begin
+        bfft(y) # warm up
         @test (@test_allocations bfft(y)) <= 47
     end
 end

@@ -1,6 +1,5 @@
 # Plans
-
-abstract type FFTAPlan{T,N} <: AbstractFFTs.Plan{T} end
+abstract type FFTAPlan{T,N} end
 
 struct FFTAInvPlan{_T,_N} <: FFTAPlan{_T,_N} end
 
@@ -68,10 +67,10 @@ end
 
 _sort(region::T) where T<:RegionTypes = issorted(region) ? copy(region) : sort(region)
 
-AbstractFFTs.plan_fft(x::AbstractArray{T,N}, region; kwargs...) where {T<:Complex,N} =
+plan_fft(x::AbstractArray{T,N}, region::RegionTypes = 1:N; kwargs...) where {T<:Complex,N} =
     _plan_fft(x, region, FFT_FORWARD; kwargs...)
 
-AbstractFFTs.plan_bfft(x::AbstractArray{T,N}, region; kwargs...) where {T<:Complex,N} =
+plan_bfft(x::AbstractArray{T,N}, region::RegionTypes = 1:N; kwargs...) where {T<:Complex,N} =
     _plan_fft(x, region, FFT_BACKWARD; kwargs...)
 
 function _plan_fft(
@@ -99,9 +98,9 @@ function _plan_fft(
     end
 end
 
-function AbstractFFTs.plan_rfft(
+function plan_rfft(
     x::AbstractArray{T,N},
-    region::RegionTypes;
+    region::RegionTypes = 1:N;
     BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...
 ) where {T<:Real,N}
     M = length(region)
@@ -124,10 +123,10 @@ function AbstractFFTs.plan_rfft(
     end
 end
 
-function AbstractFFTs.plan_brfft(
+function plan_brfft(
     x::AbstractArray{T,N},
     len::Int,
-    region::RegionTypes;
+    region::RegionTypes = 1:N;
     BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...
 ) where {T,N}
     M = length(region)
