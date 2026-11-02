@@ -46,6 +46,7 @@ Random.seed!(1)
     @testset verbose = true "QA" begin
         include("qa/aqua.jl")
         include("qa/explicit_imports.jl")
+        include("qa/fftw_coexistence.jl")
     end
     @testset verbose = true "Argument checking" begin
         include("argument_checking.jl")
