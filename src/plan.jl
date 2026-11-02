@@ -19,18 +19,33 @@ function FFTAPlan_cx{T,N}(
     FFTAPlan_cx{T,N,R}(cg, r, dir, FFTAInvPlan{T,N}())
 end
 
-struct FFTAPlan_re{T,N,R<:RegionTypes{N}} <: FFTAPlan{T,N}
+struct FFTAPlan_re{T,N,R<:RegionTypes{N},S<:Real} <: FFTAPlan{T,N}
     callgraph::NTuple{N,CallGraph{T}}
     region::R
     dir::Direction
     flen::Int
+    buf::Vector{T}    # scratch for the real<->complex packing, see `_re_buflen`
+    rbuf::Vector{S}   # contiguous copy of a strided real pencil, see `_re_pencil_loop!`
+    cbuf::Vector{T}   # contiguous copy of a strided complex pencil
     pinv::FFTAInvPlan{T,N}
 end
 function FFTAPlan_re{T,N}(
     cg::NTuple{N,CallGraph{T}}, r::R,
     dir::Direction, flen::Int
 ) where {T,N,R<:RegionTypes{N}}
-    FFTAPlan_re{T,N,R}(cg, r, dir, flen, FFTAInvPlan{T,N}())
+    S = real(T)
+    buf = Vector{T}(undef, _re_buflen(flen, dir))
+    FFTAPlan_re{T,N,R,S}(cg, r, dir, flen, buf, Vector{S}(undef, flen), Vector{T}(undef, flen ÷ 2 + 1), FFTAInvPlan{T,N}())
+end
+
+# Scratch length needed by the real-transform pencil kernels for a plan of
+# real length `n` (see `_rfft_pencil!` / `_brfft_pencil!`).
+function _re_buflen(n::Int, dir::Direction)
+    if iseven(n)
+        dir === FFT_FORWARD ? n >> 1 : n
+    else
+        dir === FFT_FORWARD ? n : 2n
+    end
 end
 
 function Base.size(p::FFTAPlan{<:Any,N}, i::Int) where N
@@ -45,8 +60,6 @@ function Base.size(p::FFTAPlan{<:Any,N}, i::Int) where N
     end
 end
 Base.size(p::FFTAPlan{<:Any,N}) where N = ntuple(Base.Fix1(size, p), Val{N}())
-
-Base.complex(p::FFTAPlan_re{T,N,R}) where {T,N,R} = FFTAPlan_cx{T,N,R}(p.callgraph, p.region, p.dir, p.pinv)
 
 function _sort(region::T)::T where {N,T<:NTuple{N,Int}}
     @static if VERSION >= v"1.12"
@@ -99,7 +112,22 @@ function _plan_fft(
     end
 end
 
-function AbstractFFTs.plan_rfft(
+# The `AbstractFFTs` entry points deliberately leave `region` unannotated: an
+# annotation such as `region::RegionTypes` makes these methods ambiguous with
+# FFTW.jl's `plan_rfft(::StridedArray{Float64}, region)` when both packages
+# are loaded (neither is more specific in every argument), which turns
+# `rfft(x)` into a `MethodError`. With the annotation on the array only,
+# FFTW's methods are strictly more specific and win, as AbstractFFTs intends.
+AbstractFFTs.plan_rfft(x::AbstractArray{T,N}, region; kwargs...) where {T<:Real,N} =
+    _plan_rfft(x, _region(region); kwargs...)
+
+AbstractFFTs.plan_brfft(x::AbstractArray{T,N}, len::Integer, region; kwargs...) where {T,N} =
+    _plan_brfft(x, Int(len), _region(region); kwargs...)
+
+_region(r::RegionTypes) = r
+_region(r) = collect(Int, r)
+
+function _plan_rfft(
     x::AbstractArray{T,N},
     region::RegionTypes;
     BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...
@@ -116,15 +144,17 @@ function AbstractFFTs.plan_rfft(
         return FFTAPlan_re{Complex{T},1}((g,), R1, FFT_FORWARD, n)
     elseif M == 2
         R2 = _sort(region)
-        g1 = CallGraph{Complex{T}}(size(x, R2[1]), BLUESTEIN_CUTOFF)
+        n = size(x, R2[1])
+        nn = iseven(n) ? n >> 1 : n
+        g1 = CallGraph{Complex{T}}(nn, BLUESTEIN_CUTOFF)
         g2 = CallGraph{Complex{T}}(size(x, R2[2]), BLUESTEIN_CUTOFF)
-        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, size(x, R2[1]))
+        return FFTAPlan_re{Complex{T},2}((g1, g2), R2, FFT_FORWARD, n)
     else
         throw(ArgumentError("only supports 1D and 2D FFTs"))
     end
 end
 
-function AbstractFFTs.plan_brfft(
+function _plan_brfft(
     x::AbstractArray{T,N},
     len::Int,
     region::RegionTypes;
@@ -141,7 +171,8 @@ function AbstractFFTs.plan_brfft(
         return FFTAPlan_re{T,1}((g,), R1, FFT_BACKWARD, len)
     elseif M == 2
         R2 = _sort(region)
-        g1 = CallGraph{T}(len, BLUESTEIN_CUTOFF)
+        nn = iseven(len) ? len >> 1 : len
+        g1 = CallGraph{T}(nn, BLUESTEIN_CUTOFF)
         g2 = CallGraph{T}(size(x, R2[2]), BLUESTEIN_CUTOFF)
         return FFTAPlan_re{T,2}((g1, g2), R2, FFT_BACKWARD, len)
     else
@@ -384,200 +415,271 @@ function Base.:*(p::FFTAPlan_cx{T,N1}, x::AbstractArray{T,N2}) where {T<:Complex
 end
 
 ### Real
-# By converting the problem to complex and back to real
-#### 1D plan 1D array
-##### Forward
-function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractVector{T}) where {T<:Real}
-    if p.dir !== FFT_FORWARD
-        throw(ArgumentError("only FFT_FORWARD supported for real vectors"))
+# Real transforms are computed from complex transforms of half (even `n`) or
+# full (odd `n`) length; see `_rfft_pencil!`/`_brfft_pencil!`. All entry points
+# funnel into `mul!`, which is allocation-free for 1D plans (the scratch space
+# lives in the plan) and applies the same 1D kernel to every pencil along the
+# transform dimension of an N-d array.
+
+function _check_re_dims(y, p::FFTAPlan_re, x, d1::Int, fwd::Bool)
+    # `x` is the input, `y` the output; the real-length dimension is `d1`.
+    rlen, clen = p.flen, p.flen ÷ 2 + 1
+    xr, yr = fwd ? (rlen, clen) : (clen, rlen)
+    if ndims(x) != ndims(y)
+        throw(DimensionMismatch("input has $(ndims(x)) dimensions, output has $(ndims(y))"))
+    elseif size(x, d1) != xr
+        throw(DimensionMismatch("real 1D plan has size $rlen. Dimension of input array along region $d1 should have size $xr, but has size $(size(x, d1))"))
+    elseif size(y, d1) != yr
+        throw(DimensionMismatch("output array should have size $yr along region $d1, but has size $(size(y, d1))"))
     end
-    Base.require_one_based_indexing(x)
-
-    n = p.flen
-    p_c = complex(p)
-    if iseven(n)
-        # For problems of even size, we solve the rfft problem by splitting the
-        # problem into the even and odd part and solving them simultaneously as
-        # a single (complex) fft of half the size, see equations (6)-(8) of
-        # Sorensen, H. V., D. Jones, Michael Heideman, and C. Burrus.
-        # "Real-valued fast Fourier transform algorithms."
-        # IEEE Transactions on acoustics, speech, and signal processing 35, no. 6 (2003): 849-863.
-        if x isa Vector && isbitstype(T)
-            # For a vector of bits, we can just reinterpret the bits to get the
-            # appropriate representation of even (zero based) elements as the real
-            # part and the odd as the complex part
-            x_c = reinterpret(Complex{T}, x)
-        else
-            # for non-bits, we'd have to copy to a new array
-            x_c = complex.(view(x, 1:2:n), view(x, 2:2:n))
+    for i in 1:ndims(x)
+        if i != d1 && size(x, i) != size(y, i)
+            throw(DimensionMismatch("input array has size $(size(x)), but output array has size $(size(y))"))
         end
+    end
+    return nothing
+end
 
+# Forward real-to-complex transform of one pencil: `x` real of length `n`,
+# `y` complex of length `n ÷ 2 + 1`.
+function _rfft_pencil!(y::AbstractVector{T}, x::AbstractVector{<:Real}, p::FFTAPlan_re{T}) where {T<:Complex}
+    n = p.flen
+    R = real(T)
+    cg = p.callgraph[1]
+    buf = p.buf
+    if iseven(n)
+        # Solve the rfft problem by splitting the input into even and odd parts
+        # and solving them simultaneously as a single (complex) fft of half
+        # the size, see equations (6)-(8) of Sorensen, H. V., D. Jones, Michael
+        # Heideman, and C. Burrus. "Real-valued fast Fourier transform
+        # algorithms." IEEE Transactions on acoustics, speech, and signal
+        # processing 35, no. 6 (2003): 849-863.
         m = n >> 1
-        # Allocate complex result vector of half the input size plus one
-        y = similar(x_c, m + 1)
-        # Solve the complex fft of half the size
-        LinearAlgebra.mul!(view(y, 1:m), p_c, x_c)
-
-        # The w stored in the plan is for m, not n, so probably cheapest to
-        # just recompute it instead of taking a square root
-        z1 = singleton_params(-one(T) / n)
-        wj = cispi(-T(2) / n)
+        @inbounds for j in 1:m
+            buf[j] = T(x[2j - 1], x[2j])
+        end
+        fft!(view(y, 1:m), buf, 1, 1, FFT_FORWARD, cg[1].type, cg, 1)
 
         # Construct the result by first constructing the elements of the
         # real and imaginary part, followed by the usual radix-2 assembly,
-        # see eq (9)
-        y1     = y[1]
-        y[1]   = real(y1) + imag(y1)
-        y[end] = real(y1) - imag(y1)
-
-        @inbounds for j in 2:((m >> 1) + 1)
-            yj  = y[j]
-            ymj = y[m-j+2]
-            XX = T(0.5) * ( yj + conj(ymj))
-            XY = T(0.5) * (-yj + conj(ymj)) * im
-            y[j]     =      XX + wj * XY
-            y[m-j+2] = conj(XX - wj * XY)
-            wj = singleton_step(wj, z1)
+        # see eq (9). The twiddle is for `n`, not `m`, so it is recomputed.
+        z1 = singleton_params(-one(R) / n)
+        wj = cispi(-R(2) / n)
+        @inbounds begin
+            y1 = y[1]
+            y[1]     = real(y1) + imag(y1)
+            y[m + 1] = real(y1) - imag(y1)
+            for j in 2:((m >> 1) + 1)
+                yj  = y[j]
+                ymj = y[m - j + 2]
+                XX = R(0.5) * ( yj + conj(ymj))
+                XY = R(0.5) * (-yj + conj(ymj)) * im
+                y[j]         =      XX + wj * XY
+                y[m - j + 2] = conj(XX - wj * XY)
+                wj = singleton_step(wj, z1)
+            end
         end
-        return y
     else
-        # when the problem cannot be split in two equal size chunks we
-        # convert the problem to a complex fft and truncate the redundant
-        # part of the result vector
-        if size(p_c) != size(x)
-            throw(DimensionMismatch("plan and input array axes do not match"))
+        # Odd length: run the full transform on the real input (the kernels
+        # accept real input; the DFT leaf exploits its symmetry) and keep the
+        # first half.
+        fft!(buf, x, 1, 1, FFT_FORWARD, cg[1].type, cg, 1)
+        @inbounds for j in 1:(n ÷ 2 + 1)
+            y[j] = buf[j]
         end
-        y = similar(x, Complex{T})
-        fft!(y, x, 1, 1, p_c.dir, p_c.callgraph[1][1].type, p_c.callgraph[1], 1)
-        return y[1:end÷2+1]
     end
+    return y
 end
 
-##### Backward
-function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractVector{T}) where {T<:Complex}
-    if p.dir !== FFT_BACKWARD
-        throw(ArgumentError("only FFT_BACKWARD supported for complex vectors"))
-    end
-    Base.require_one_based_indexing(x)
-
+# Backward complex-to-real transform of one pencil: `y` complex of length
+# `n ÷ 2 + 1`, `x` real of length `n`.
+function _brfft_pencil!(x::AbstractVector{<:Real}, y::AbstractVector{T}, p::FFTAPlan_re{T}) where {T<:Complex}
     n = p.flen
-    p_c = complex(p)
-    # See explanation of this approach in the method for the FORWARD transform
+    R = real(T)
+    cg = p.callgraph[1]
+    buf = p.buf
     if iseven(n)
+        # Inverse of the even-length trick in `_rfft_pencil!`.
         m = n >> 1
-
-        R = real(T)
+        tmp = view(buf, 1:m)
+        out = view(buf, m + 1:2m)
         z1 = singleton_params(one(R) / n)
         wj = cispi(R(2) / n)
-
-        x_tmp = similar(x, length(x) - 1)
-        x_tmp[1] = complex(
-            (real(x[1]) + real(x[end])),
-            (real(x[1]) - real(x[end]))
-        )
-        for j in 2:((m >> 1) + 1)
-            XX =       x[j] + conj(x[m-j+2])
-            XY = wj * (x[j] - conj(x[m-j+2]))
-            x_tmp[j]     =      XX + im * XY
-            x_tmp[m-j+2] = conj(XX - im * XY)
-            wj = singleton_step(wj, z1)
-        end
-
-        y_c = p_c * x_tmp
-        if isbitstype(T)
-            return copy(reinterpret(R, y_c))
-        else
-            y_re = similar(y_c, R, 2 * length(y_c))
-            for i in eachindex(y_c)
-                y_re[2i-1], y_re[2i] = reim(y_c[i])
+        @inbounds begin
+            tmp[1] = T(real(y[1]) + real(y[m + 1]), real(y[1]) - real(y[m + 1]))
+            for j in 2:((m >> 1) + 1)
+                XX =       y[j] + conj(y[m - j + 2])
+                XY = wj * (y[j] - conj(y[m - j + 2]))
+                tmp[j]         =      XX + im * XY
+                tmp[m - j + 2] = conj(XX - im * XY)
+                wj = singleton_step(wj, z1)
             end
-            return y_re
+        end
+        fft!(out, tmp, 1, 1, FFT_BACKWARD, cg[1].type, cg, 1)
+        @inbounds for j in 1:m
+            x[2j - 1] = real(out[j])
+            x[2j]     = imag(out[j])
         end
     else
-        x_tmp = similar(x, n)
-        x_tmp[1:end÷2+1] .= x
-        x_tmp[end÷2+2:end] .= @views conj.(x[end-iseven(n):-1:2])
-        y = similar(x_tmp)
-        LinearAlgebra.mul!(y, p_c, x_tmp)
-        return real(y)
+        # Odd length: rebuild the conjugate-symmetric spectrum and transform.
+        h = n ÷ 2 + 1
+        tmp = view(buf, 1:n)
+        out = view(buf, n + 1:2n)
+        @inbounds for j in 1:h
+            tmp[j] = y[j]
+        end
+        @inbounds for j in h + 1:n
+            tmp[j] = conj(y[n - j + 2])
+        end
+        fft!(out, tmp, 1, 1, FFT_BACKWARD, cg[1].type, cg, 1)
+        @inbounds for j in 1:n
+            x[j] = real(out[j])
+        end
+    end
+    return x
+end
+
+# Unit-stride pencils are handed to the kernels directly; strided ones are
+# copied to the plan's contiguous buffers first. The copy costs one pass over
+# the pencil but keeps the kernel's scattered reads within cache lines — for a
+# stride of a cache line or more the kernel is otherwise 1.2–1.3× slower.
+_unit_stride(v::StridedArray) = stride(v, 1) == 1
+_unit_stride(v) = false
+
+# Apply `kernel!(y_pencil, x_pencil, p)` along dimension `R` of `x` and `y`.
+function _re_pencil_loop!(kernel!::F, y::AbstractArray{<:Any,N}, x::AbstractArray{<:Any,N}, p::FFTAPlan_re, ::Val{R}) where {F,N,R}
+    Rpre  = CartesianIndices(ntuple(Base.Fix1(size, x),  Val(R - 1)))
+    Rpost = CartesianIndices(ntuple(i -> size(x, R + i), Val(N - R)))
+    contiguous = R == 1 && _unit_stride(x) && _unit_stride(y)
+    if contiguous
+        for Ipost in Rpost, Ipre in Rpre
+            @views kernel!(y[Ipre, :, Ipost], x[Ipre, :, Ipost], p)
+        end
+    else
+        xin, yout = _pencil_buffers(kernel!, p)
+        for Ipost in Rpost, Ipre in Rpre
+            xv = @view x[Ipre, :, Ipost]
+            yv = @view y[Ipre, :, Ipost]
+            copyto!(xin, xv)
+            kernel!(yout, xin, p)
+            copyto!(yv, yout)
+        end
+    end
+    return y
+end
+# forward: real in, complex out; backward: complex in, real out
+_pencil_buffers(::typeof(_rfft_pencil!), p::FFTAPlan_re) = (p.rbuf, p.cbuf)
+_pencil_buffers(::typeof(_brfft_pencil!), p::FFTAPlan_re) = (p.cbuf, p.rbuf)
+
+# Dispatch on the transform dimension so that the loop above is type-stable.
+function _re_along_dim!(kernel!::F, y::AbstractArray{<:Any,N}, x::AbstractArray{<:Any,N}, p::FFTAPlan_re, d::Int) where {F,N}
+    if @generated
+        quote
+            Base.Cartesian.@nif $N dim -> (d == dim) dim -> (_re_pencil_loop!(kernel!, y, x, p, Val(dim)))
+        end
+    else
+        _re_pencil_loop!(kernel!, y, x, p, Val(d))
     end
 end
 
-#### 1D plan ND array
-##### Forward
-function Base.:*(p::FFTAPlan_re{Complex{T},1}, x::AbstractArray{T,N}) where {T<:Real,N}
-    if p.dir !== FFT_FORWARD
-        throw(ArgumentError("only FFT_FORWARD supported for real arrays"))
+function _cx_along_dim!(A::AbstractArray{<:Any,N}, cg::CallGraph{T}, dir::Direction, d::Int) where {N,T}
+    n = size(A, d)
+    ibuf = Vector{T}(undef, n)
+    obuf = Vector{T}(undef, n)
+    if @generated
+        quote
+            Base.Cartesian.@nif $N dim -> (d == dim) dim -> (fft_along_dim!(A, ibuf, obuf, cg, dir, Val(dim)))
+        end
+    else
+        fft_along_dim!(A, ibuf, obuf, cg, dir, Val(d))
     end
-    Base.require_one_based_indexing(x)
-    return mapslices(Base.Fix1(*, p), x; dims=only(p.region))
+end
+
+## mul!
+#### 1D plan
+##### Forward
+function LinearAlgebra.mul!(y::AbstractArray{T,N}, p::FFTAPlan_re{T,1}, x::AbstractArray{<:Real,N}) where {T<:Complex,N}
+    if p.dir !== FFT_FORWARD
+        throw(ArgumentError("only FFT_FORWARD supported for real $(N == 1 ? "vectors" : "arrays")"))
+    end
+    Base.require_one_based_indexing(x, y)
+    d1 = only(p.region)
+    _check_re_dims(y, p, x, d1, true)
+    if N == 1
+        _rfft_pencil!(y, x, p)
+    else
+        _re_along_dim!(_rfft_pencil!, y, x, p, d1)
+    end
+    return y
 end
 
 ##### Backward
-function Base.:*(p::FFTAPlan_re{T,1}, x::AbstractArray{T,N}) where {T<:Complex,N}
+function LinearAlgebra.mul!(y::AbstractArray{<:Real,N}, p::FFTAPlan_re{T,1}, x::AbstractArray{T,N}) where {T<:Complex,N}
     if p.dir !== FFT_BACKWARD
-        throw(ArgumentError("only FFT_BACKWARD supported for complex arrays"))
+        throw(ArgumentError("only FFT_BACKWARD supported for complex $(N == 1 ? "vectors" : "arrays")"))
     end
-    Base.require_one_based_indexing(x)
-    dim1 = only(p.region)
-    rlen = p.flen ÷ 2 + 1
-    if rlen != size(x, dim1)
-        throw(DimensionMismatch("real 1D plan has size $(p.flen). Dimension of input array along region $dim1 should have size $rlen, but has size $(size(x, dim1))"))
+    Base.require_one_based_indexing(x, y)
+    d1 = only(p.region)
+    _check_re_dims(y, p, x, d1, false)
+    if N == 1
+        _brfft_pencil!(y, x, p)
+    else
+        _re_along_dim!(_brfft_pencil!, y, x, p, d1)
     end
-    return mapslices(Base.Fix1(*, p), x; dims=dim1)
+    return y
 end
 
-#### 2D plan ND array
+#### 2D plan
+# The real transform is taken along the first region dimension, then a complex
+# transform along the second (forward), or the reverse (backward).
 ##### Forward
-function Base.:*(p::FFTAPlan_re{Complex{T},2}, x::AbstractArray{T,N}) where {T<:Real,N}
+function LinearAlgebra.mul!(y::AbstractArray{T,N}, p::FFTAPlan_re{T,2}, x::AbstractArray{<:Real,N}) where {T<:Complex,N}
     if p.dir !== FFT_FORWARD
         throw(ArgumentError("only FFT_FORWARD supported for real arrays"))
     end
-    Base.require_one_based_indexing(x)
-    half_1 = 1:(p.flen÷2+1)
-    x_c = complex(x)
-    y = similar(x_c)
-    LinearAlgebra.mul!(y, complex(p), x_c)
-    return copy(selectdim(y, first(p.region), half_1))
+    Base.require_one_based_indexing(x, y)
+    d1, d2 = p.region
+    _check_re_dims(y, p, x, d1, true)
+    if size(x, d2) != size(p, 2)
+        throw(DimensionMismatch("real 2D plan has size $(size(p)). Transform dimensions of input array are $((size(x, d1), size(x, d2))) but should be $(size(p))"))
+    end
+    _re_along_dim!(_rfft_pencil!, y, x, p, d1)
+    _cx_along_dim!(y, p.callgraph[2], FFT_FORWARD, d2)
+    return y
 end
 
 ##### Backward
-function Base.:*(p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex,N}
+function LinearAlgebra.mul!(y::AbstractArray{<:Real,N}, p::FFTAPlan_re{T,2}, x::AbstractArray{T,N}) where {T<:Complex,N}
     if p.dir !== FFT_BACKWARD
         throw(ArgumentError("only FFT_BACKWARD supported for complex arrays"))
     end
-    Base.require_one_based_indexing(x)
-
-    dim1 = first(p.region)
-    dim2 = last(p.region)
-    x_sz = (xrows, xcols) = (size(x, dim1), size(x, dim2))
-
-    flen = p.flen
-    tlen = flen ÷ 2 + 1
-    t_sz = (tlen, size(p, 2))
-
-    if t_sz != x_sz
-        throw(DimensionMismatch("real 2D plan has size $(size(p)). Transform dimensions of input array are $x_sz but should be $t_sz"))
+    Base.require_one_based_indexing(x, y)
+    d1, d2 = p.region
+    _check_re_dims(y, p, x, d1, false)
+    if size(x, d2) != size(p, 2)
+        throw(DimensionMismatch("real 2D plan has size $(size(p)). Transform dimensions of input array are $((size(x, d1), size(x, d2))) but should be $((size(p, 1) ÷ 2 + 1, size(p, 2)))"))
     end
+    tmp = copy(x)   # the complex pass must not modify the input
+    _cx_along_dim!(tmp, p.callgraph[2], FFT_BACKWARD, d2)
+    _re_along_dim!(_brfft_pencil!, y, tmp, p, d1)
+    return y
+end
 
-    res_size = ntuple(i -> ifelse(i == dim1, flen, size(x, i)), Val(N))
-    # for the inverse transformation we have to reconstruct the full array
-    half_1 = 1:tlen
-    half_2 = tlen+1:flen
-    x_full = similar(x, res_size)
-    # use first half as is
-    copy!(selectdim(x_full, dim1, half_1), x)
+## *
+function Base.:*(p::FFTAPlan_re{T,M}, x::AbstractArray{<:Real,N}) where {T<:Complex,M,N}
+    if p.dir !== FFT_FORWARD
+        throw(ArgumentError("only FFT_FORWARD supported for real $(N == 1 ? "vectors" : "arrays")"))
+    end
+    d1 = first(p.region)
+    y = similar(x, T, ntuple(i -> i == d1 ? p.flen ÷ 2 + 1 : size(x, i), Val(N)))
+    return LinearAlgebra.mul!(y, p, x)
+end
 
-    # the second half in the first transform dimension is reversed and conjugated
-    x_half_2 = selectdim(x_full, dim1, half_2) # view to the second half of x
-    start_reverse = xrows - iseven(flen)
-
-    map!(conj, x_half_2, selectdim(x, dim1, start_reverse:-1:2))
-    # for the 2D transform we have to reverse index 2:end of the same block in the second transform dimension as well
-    reverse!(selectdim(x_half_2, dim2, 2:xcols), dims=dim2)
-
-    y = similar(x_full)
-    LinearAlgebra.mul!(y, complex(p), x_full)
-
-    return real(y)
+function Base.:*(p::FFTAPlan_re{T,M}, x::AbstractArray{T,N}) where {T<:Complex,M,N}
+    if p.dir !== FFT_BACKWARD
+        throw(ArgumentError("only FFT_BACKWARD supported for complex $(N == 1 ? "vectors" : "arrays")"))
+    end
+    d1 = first(p.region)
+    y = similar(x, real(T), ntuple(i -> i == d1 ? p.flen : size(x, i), Val(N)))
+    return LinearAlgebra.mul!(y, p, x)
 end
