@@ -1,12 +1,14 @@
 using Test, FFTA
 using LinearAlgebra: LinearAlgebra
 
-@testset "Only 1D and 2D FFTs" begin
+@testset "N-d real plans" begin
     xr = zeros(2, 2, 2)
     xc = complex(xr)
 
-    @test_throws ArgumentError("only supports 1D and 2D FFTs") plan_rfft(xr, 1:3)
-    @test_throws ArgumentError("only supports 1D and 2D FFTs") plan_brfft(xc, 2, 1:3)
+    @test plan_rfft(xr, 1:3) isa FFTA.FFTAPlan_re
+    @test plan_brfft(xc, 2, 1:3) isa FFTA.FFTAPlan_re
+    @test_throws DimensionMismatch plan_rfft(xr, 1:3) * zeros(2, 2, 3)
+    @test_throws DimensionMismatch plan_brfft(xc, 2, 1:3) * zeros(ComplexF64, 2, 3, 2)
 end
 
 @testset "mismatch between plan and array" begin

@@ -20,7 +20,8 @@ end
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations fft(x)) <= 47
+        # plan creation builds one worker per thread
+        @test (@test_allocations fft(x)) <= 47 * Threads.nthreads()
     end
 end
 

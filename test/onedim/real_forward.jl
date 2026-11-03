@@ -25,7 +25,7 @@ end
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations rfft(x)) <= 51
+        @test (@test_allocations rfft(x)) <= 51 * Threads.nthreads()
     end
 end
 
