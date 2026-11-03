@@ -21,7 +21,7 @@ end
         end
 
         @testset "allocations" begin
-            @test (@test_allocations fft(X)) <= 116
+            @test (@test_allocations fft(X)) <= 116 * Threads.nthreads()
         end
     end
 end

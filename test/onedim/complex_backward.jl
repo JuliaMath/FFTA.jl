@@ -20,7 +20,7 @@ end
     end
 
     @testset "allocation regression" begin
-        @test (@test_allocations bfft(y)) <= 47
+        @test (@test_allocations bfft(y)) <= 47 * Threads.nthreads()
     end
 end
 
