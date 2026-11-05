@@ -99,7 +99,7 @@ function _plan_fft(
     end
 end
 
-AbstractFFTs.plan_rfft(x::AbstractArray, region; kwargs...) =
+AbstractFFTs.plan_rfft(x::AbstractArray{<:Real}, region; kwargs...) =
     _plan_rfft(x, region; kwargs...)
 
 AbstractFFTs.plan_brfft(x::AbstractArray, len::Integer, region; kwargs...) =
