@@ -99,7 +99,13 @@ function _plan_fft(
     end
 end
 
-function AbstractFFTs.plan_rfft(
+AbstractFFTs.plan_rfft(x::AbstractArray, region; kwargs...) =
+    _plan_rfft(x, region; kwargs...)
+
+AbstractFFTs.plan_brfft(x::AbstractArray, len::Integer, region; kwargs...) =
+    _plan_brfft(x, convert(Int, len), region; kwargs...)
+
+function _plan_rfft(
     x::AbstractArray{T,N},
     region::RegionTypes;
     BLUESTEIN_CUTOFF=DEFAULT_BLUESTEIN_CUTOFF, _kwargs...
@@ -124,7 +130,7 @@ function AbstractFFTs.plan_rfft(
     end
 end
 
-function AbstractFFTs.plan_brfft(
+function _plan_brfft(
     x::AbstractArray{T,N},
     len::Int,
     region::RegionTypes;
