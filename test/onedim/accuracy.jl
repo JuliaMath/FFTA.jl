@@ -28,6 +28,8 @@ const POWERS_OF_2 = (
     (1 << 16, 22.0),   # 65536 = 4^8
     (1 << 17, 28.0),   # 131072
     (1 << 18, 28.0),   # 262144 = 4^9
+    (1 << 20,  4.0),   # 1048576 = 4^10 (with stored tables ~1.4; ~60 with the recurrence)
+    (1 << 22,  4.0),   # 4194304 = 4^11 (with stored tables ~1.5; ~1000 with the recurrence)
 )
 
 const POWERS_OF_3 = (
